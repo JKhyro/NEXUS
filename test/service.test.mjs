@@ -152,6 +152,27 @@ test('ANVIL references can attach to readable messages', async () => {
   });
 });
 
+test('forum posts can be created and read through the shared service contract', async () => {
+  await withService(async (service) => {
+    const created = await fetch(`${service.url}/api/posts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        channelId: 'channel-report',
+        title: 'Import fidelity check',
+        body: 'This is the opening message for a report post.'
+      })
+    }).then((response) => response.json());
+
+    const posts = await fetch(`${service.url}/api/posts?actorId=identity-jack&channelId=channel-report`).then((response) => response.json());
+    const messages = await fetch(`${service.url}/api/messages?actorId=identity-jack&scopeType=post&scopeId=${created.post.id}`).then((response) => response.json());
+
+    assert(posts.some((post) => post.id === created.post.id && post.title === 'Import fidelity check'));
+    assert(messages.some((message) => message.body === 'This is the opening message for a report post.'));
+  });
+});
+
 test('store factory defaults to JSON mode and validates library-postgres configuration', async () => {
   const jsonStore = createStore({
     storageMode: 'json',

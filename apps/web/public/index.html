@@ -9,48 +9,85 @@
   <body>
     <div class="app-shell">
       <aside class="sidebar">
-        <div>
+        <div class="sidebar-header">
           <div class="eyebrow">NEXUS</div>
           <h1>Internal Core</h1>
-          <p class="muted">Desktop-first, local-first communications core.</p>
+          <p class="muted">Desktop-first, local-first communications built on native NEXUS records.</p>
         </div>
+
         <label class="field">
           <span>Acting as</span>
           <select id="actor"></select>
         </label>
+
         <label class="field">
           <span>Workspace</span>
           <select id="workspace"></select>
         </label>
+
         <label class="field">
-          <span>Search</span>
-          <input id="search" type="text" placeholder="Search visible history">
+          <span>Search visible history</span>
+          <input id="search" type="text" placeholder="Search channels, posts, and messages">
         </label>
+
+        <div class="section-heading">
+          <span class="eyebrow">Channels</span>
+        </div>
         <div id="channels" class="channel-list"></div>
       </aside>
+
       <main class="content">
-        <section class="panel">
+        <section class="panel primary-panel">
           <div class="panel-header">
             <div>
-              <div class="eyebrow">Channel</div>
+              <div class="eyebrow">Scope</div>
               <h2 id="channel-title">Select a channel</h2>
+              <p id="channel-description" class="muted panel-copy">Choose a visible lane to browse its native NEXUS records.</p>
             </div>
             <button id="refresh" type="button">Refresh</button>
           </div>
-          <div id="messages" class="messages"></div>
-          <form id="composer" class="composer">
-            <textarea id="message-body" rows="4" placeholder="Write a message into the selected scope"></textarea>
-            <button type="submit">Send</button>
-          </form>
+
+          <div id="channel-topic" class="topic-card empty">Channel guidance will appear here.</div>
+
+          <div class="scope-shell">
+            <aside id="forum-column" class="forum-column hidden">
+              <div class="subsection-header">
+                <div>
+                  <div class="eyebrow">Forum Posts</div>
+                  <h3>Posts</h3>
+                </div>
+              </div>
+              <div id="post-list" class="post-list"></div>
+              <form id="post-composer" class="composer post-composer">
+                <input id="post-title" type="text" placeholder="Post title">
+                <textarea id="post-body" rows="5" placeholder="Write the opening message for a new post"></textarea>
+                <button type="submit">Create Post</button>
+              </form>
+            </aside>
+
+            <div class="conversation-column">
+              <div id="scope-context" class="scope-context empty">No scope selected.</div>
+              <div id="messages" class="messages"></div>
+              <form id="composer" class="composer">
+                <textarea id="message-body" rows="4" placeholder="Write a message into the selected scope"></textarea>
+                <div class="composer-footer">
+                  <div id="composer-hint" class="muted">Select a writable scope to send a message.</div>
+                  <button id="send-button" type="submit">Send</button>
+                </div>
+              </form>
+            </div>
+          </div>
         </section>
+
         <section class="panel slim">
           <div class="panel-header">
             <div>
-              <div class="eyebrow">Contract</div>
-              <h2>Health</h2>
+              <div class="eyebrow">Selection</div>
+              <h2>Context</h2>
             </div>
           </div>
-          <pre id="health"></pre>
+          <div id="scope-summary" class="summary-card empty">Choose a channel to inspect its scope, topic, and imported state.</div>
+
           <div class="panel-header">
             <div>
               <div class="eyebrow">Search</div>
@@ -58,9 +95,20 @@
             </div>
           </div>
           <div id="search-results" class="search-results"></div>
+
+          <div class="panel-header">
+            <div>
+              <div class="eyebrow">Service</div>
+              <h2>Health</h2>
+            </div>
+          </div>
+          <pre id="health"></pre>
+
+          <div id="status" class="status hidden"></div>
         </section>
       </main>
     </div>
+
     <script type="module" src="/app.js"></script>
   </body>
   </html>
