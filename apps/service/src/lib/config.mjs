@@ -10,6 +10,10 @@ export function resolveServiceConfig(overrides = {}) {
   const dataDir = overrides.dataDir ?? process.env.NEXUS_DATA_DIR ?? join(repoRoot, 'runtime');
   const bootstrapPath = overrides.bootstrapPath ?? join(repoRoot, 'config', 'internal-bootstrap.json');
   const staticDir = overrides.staticDir ?? join(repoRoot, 'apps', 'web', 'public');
+  const storageMode = overrides.storageMode ?? process.env.NEXUS_STORAGE_MODE ?? 'json';
+  const libraryConnectionString = overrides.libraryConnectionString ?? process.env.NEXUS_LIBRARY_CONNECTION_STRING ?? '';
+  const libraryChatbaseSchema = overrides.libraryChatbaseSchema ?? process.env.NEXUS_LIBRARY_CHATBASE_SCHEMA ?? 'nexus_chatbase';
+  const libraryMetabaseSchema = overrides.libraryMetabaseSchema ?? process.env.NEXUS_LIBRARY_METABASE_SCHEMA ?? 'nexus_metabase';
 
   return {
     repoRoot,
@@ -17,6 +21,10 @@ export function resolveServiceConfig(overrides = {}) {
     port,
     dataDir,
     bootstrapPath,
-    staticDir
+    staticDir,
+    storageMode,
+    libraryConnectionString,
+    libraryChatbaseSchema,
+    libraryMetabaseSchema
   };
 }

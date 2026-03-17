@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The MVP uses simple local persistence to make the service executable now, while preserving the long-term separation between communication records and policy/registry data.
+The MVP preserves the long-term separation between communication records and policy/registry data regardless of the backing store.
 
 The important rule is structural, not just technical:
 
@@ -64,21 +64,36 @@ Reads must be evaluated like this:
 
 This prevents retained history from becoming a backdoor around private spaces.
 
-## MVP persistence choice
+## MVP persistence modes
 
-The first implementation pass may use local JSON-backed scaffolds for:
+The executable scaffold now supports two storage modes behind the same service contract:
 
-- `runtime/metabase.json`
-- `runtime/chatbase.json`
+- `json`
+  Local bootstrap/runtime persistence in:
+  - `runtime/metabase.json`
+  - `runtime/chatbase.json`
+- `library-postgres`
+  LIBRARY-backed persistence using dedicated NEXUS schemas:
+  - `nexus_metabase`
+  - `nexus_chatbase`
 
-That is an implementation convenience, not a product-level naming decision. The product model remains CHATBASE/METABASE even when the persistence backend changes later.
+JSON is an implementation convenience for bootstrap and local smoke work. It is not the product-level storage decision.
 
-## Migration direction
+The `library-postgres` mode stores NEXUS-native records in LIBRARY without changing:
 
-The long-term backend can replace local JSON scaffolds with richer LIBRARY-backed persistence without changing:
+- entity names
+- access policy
+- adapter mapping shape
+- ANVIL external-reference behavior
+
+## Current migration direction
+
+The active migration path is to move from JSON bootstrap scaffolds to LIBRARY-backed persistence without changing:
 
 - service contracts
 - identity model
 - access model
 - adapter shape
 - external-reference model
+
+The remaining work is verification and hardening against the live LIBRARY Postgres environment, not redesign of the contract.

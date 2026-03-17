@@ -36,9 +36,30 @@ NEXUS is the in-house communications and coordination product that replaces Disc
 ```powershell
 npm install
 npm run service:start
+npm run service:library
 npm run desktop:start
 npm test
 ```
+
+## Storage modes
+
+The service now supports two persistence modes behind the same contract:
+
+- `json`
+  Bootstrap/runtime convenience mode using `runtime/metabase.json` and `runtime/chatbase.json`
+- `library-postgres`
+  LIBRARY-backed persistence mode that writes NEXUS-native records into separate `CHATBASE` and `METABASE` schemas in Postgres
+
+Environment keys for `library-postgres` mode:
+
+```powershell
+$env:NEXUS_STORAGE_MODE = 'library-postgres'
+$env:NEXUS_LIBRARY_CONNECTION_STRING = 'postgres://...'
+$env:NEXUS_LIBRARY_CHATBASE_SCHEMA = 'nexus_chatbase'
+$env:NEXUS_LIBRARY_METABASE_SCHEMA = 'nexus_metabase'
+```
+
+The product contract stays the same across both modes. JSON is only the bootstrap backend; LIBRARY-backed persistence is the intended long-term path.
 
 ## Architecture records
 

@@ -10,7 +10,7 @@ It is intentionally small and internal-first. The contract is designed to power 
 
 - Protocol: HTTP + JSON
 - Authority: local workstation service in the MVP
-- Persistence: local CHATBASE and METABASE scaffolds
+- Persistence: shared CHATBASE and METABASE model backed by either JSON bootstrap storage or LIBRARY-backed Postgres storage
 - Audience: internal humans and system identities only
 
 ## Core entities
@@ -68,6 +68,7 @@ It is intentionally small and internal-first. The contract is designed to power 
 
 ## Contract rules
 
+- `GET /api/health` must expose the active `storageMode` and safe storage labels, so desktop and future web clients can tell whether they are talking to bootstrap JSON or LIBRARY-backed persistence.
 - Adapter payloads may contain external transport identifiers but must map into internal NEXUS objects before persistence.
 - External references never redefine the owning object; they only link outward.
 - All persisted messages generate message events in CHATBASE.

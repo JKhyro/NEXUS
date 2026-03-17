@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import { CONTRACT_VERSION } from '../../../packages/contracts/src/index.mjs';
 import { resolveServiceConfig } from './lib/config.mjs';
-import { NexusStore } from './lib/store.mjs';
+import { createStore } from './lib/store-factory.mjs';
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -47,6 +47,7 @@ async function routeApi(request, response, store, config) {
       status: 'ok',
       contractVersion: CONTRACT_VERSION,
       mode: 'desktop-local-first',
+      storageMode: config.storageMode,
       storage: {
         metabasePath: store.metabasePath,
         chatbasePath: store.chatbasePath
@@ -134,10 +135,7 @@ async function routeApi(request, response, store, config) {
 
 export async function createNexusService(overrides = {}) {
   const config = resolveServiceConfig(overrides);
-  const store = new NexusStore({
-    dataDir: config.dataDir,
-    bootstrapPath: config.bootstrapPath
-  });
+  const store = createStore(config);
   await store.init();
 
   const server = http.createServer(async (request, response) => {
@@ -167,6 +165,7 @@ export async function createNexusService(overrides = {}) {
     },
     async stop() {
       await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+      await store.close();
     }
   };
 }

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createNexusService } from '../apps/service/src/server.mjs';
+import { createStore } from '../apps/service/src/lib/store-factory.mjs';
 
 async function withService(run) {
   const dataDir = await mkdtemp(join(tmpdir(), 'nexus-'));
@@ -125,4 +126,21 @@ test('ANVIL references can attach to readable messages', async () => {
     assert.equal(references.length, 1);
     assert.equal(references[0].system, 'anvil');
   });
+});
+
+test('store factory defaults to JSON mode and validates library-postgres configuration', async () => {
+  const jsonStore = createStore({
+    storageMode: 'json',
+    dataDir: 'runtime',
+    bootstrapPath: 'config/internal-bootstrap.json'
+  });
+  assert.equal(jsonStore.constructor.name, 'NexusJsonStore');
+
+  assert.throws(() => {
+    createStore({
+      storageMode: 'library-postgres',
+      bootstrapPath: 'config/internal-bootstrap.json',
+      libraryConnectionString: ''
+    });
+  }, /NEXUS_LIBRARY_CONNECTION_STRING/);
 });

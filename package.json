@@ -11,8 +11,12 @@
   "scripts": {
     "service:start": "node apps/service/src/server.mjs",
     "service:dev": "node --watch apps/service/src/server.mjs",
+    "service:library": "node apps/service/src/server.mjs",
     "desktop:start": "electron .",
     "test": "node --test"
+  },
+  "dependencies": {
+    "pg": "^8.16.0"
   },
   "devDependencies": {
     "electron": "^37.0.0"
