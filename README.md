@@ -25,7 +25,7 @@ NEXUS is the in-house communications and coordination product that replaces Disc
 - `apps/desktop`
   Desktop shell that manages the local service and loads the local web surface.
 - `apps/web`
-  Browser-facing NEXUS client that uses the same service contract for channel browsing, forum posts, search, and composition.
+  Browser-facing NEXUS client that uses the same service contract for channel browsing, direct conversations, forum posts, native threads, search, and composition.
 - `packages/contracts`
   Shared entity kinds and input validators for the MVP contract.
 - `config/internal-bootstrap.json`
@@ -67,10 +67,12 @@ The product contract stays the same across both modes. JSON is only the bootstra
 The current desktop/web client can:
 
 - browse visible workspaces and channels
+- open and create direct conversations between internal identities
 - open forum-style channels as native post lists
+- open and create native threads under channels and posts
 - read imported Discord history from NEXUS-native channels and posts
 - create forum posts and ordinary messages through the same service contract
-- search visible history and jump into matching channel or post scopes
+- search visible history and jump into matching channel, post, thread, or direct scopes
 
 For normal local use, copy [config/nexus.local.example.json](config/nexus.local.example.json) to `config/nexus.local.json` and fill in the real LIBRARY connection details. The service and desktop shell will pick that file up automatically.
 

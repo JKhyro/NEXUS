@@ -173,6 +173,78 @@ test('forum posts can be created and read through the shared service contract', 
   });
 });
 
+test('direct conversations can be created, listed, and messaged through the shared service contract', async () => {
+  await withService(async (service) => {
+    const created = await fetch(`${service.url}/api/direct-conversations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        memberIdentityIds: ['identity-jack', 'identity-kira']
+      })
+    }).then((response) => response.json());
+
+    await fetch(`${service.url}/api/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-kira',
+        scopeType: 'direct',
+        scopeId: created.id,
+        body: 'Direct conversation test message'
+      })
+    });
+
+    const conversations = await fetch(`${service.url}/api/direct-conversations?actorId=identity-kira`).then((response) => response.json());
+    const messages = await fetch(`${service.url}/api/messages?actorId=identity-jack&scopeType=direct&scopeId=${created.id}`).then((response) => response.json());
+
+    assert(conversations.some((conversation) => conversation.id === created.id));
+    assert(messages.some((message) => message.body === 'Direct conversation test message'));
+  });
+});
+
+test('threads can be created and read through the shared service contract', async () => {
+  await withService(async (service) => {
+    const post = await fetch(`${service.url}/api/posts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        channelId: 'channel-report',
+        title: 'Thread parent post',
+        body: 'Opening post body'
+      })
+    }).then((response) => response.json());
+
+    const thread = await fetch(`${service.url}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        postId: post.post.id,
+        title: 'Follow-up thread'
+      })
+    }).then((response) => response.json());
+
+    await fetch(`${service.url}/api/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        scopeType: 'thread',
+        scopeId: thread.id,
+        body: 'Threaded follow-up message'
+      })
+    });
+
+    const threads = await fetch(`${service.url}/api/threads?actorId=identity-jack&postId=${post.post.id}`).then((response) => response.json());
+    const messages = await fetch(`${service.url}/api/messages?actorId=identity-jack&scopeType=thread&scopeId=${thread.id}`).then((response) => response.json());
+
+    assert(threads.some((entry) => entry.id === thread.id && entry.title === 'Follow-up thread'));
+    assert(messages.some((message) => message.body === 'Threaded follow-up message'));
+  });
+});
+
 test('store factory defaults to JSON mode and validates library-postgres configuration', async () => {
   const jsonStore = createStore({
     storageMode: 'json',

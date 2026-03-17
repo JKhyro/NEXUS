@@ -34,6 +34,18 @@
           <span class="eyebrow">Channels</span>
         </div>
         <div id="channels" class="channel-list"></div>
+
+        <div class="section-heading">
+          <span class="eyebrow">Direct Conversations</span>
+        </div>
+        <div id="direct-conversations" class="direct-list"></div>
+        <form id="direct-composer" class="composer compact-composer">
+          <label class="field compact-field">
+            <span>Start a direct conversation</span>
+            <select id="direct-members" multiple size="6"></select>
+          </label>
+          <button type="submit">Create Direct Conversation</button>
+        </form>
       </aside>
 
       <main class="content">
@@ -49,7 +61,7 @@
 
           <div id="channel-topic" class="topic-card empty">Channel guidance will appear here.</div>
 
-          <div class="scope-shell">
+          <div id="scope-shell" class="scope-shell">
             <aside id="forum-column" class="forum-column hidden">
               <div class="subsection-header">
                 <div>
@@ -62,6 +74,21 @@
                 <input id="post-title" type="text" placeholder="Post title">
                 <textarea id="post-body" rows="5" placeholder="Write the opening message for a new post"></textarea>
                 <button type="submit">Create Post</button>
+              </form>
+            </aside>
+
+            <aside id="thread-column" class="thread-column hidden">
+              <div class="subsection-header">
+                <div>
+                  <div class="eyebrow">Threads</div>
+                  <h3>Thread Scope</h3>
+                </div>
+              </div>
+              <p id="thread-parent-copy" class="muted thread-parent-copy">Threads for the current parent scope will appear here.</p>
+              <div id="thread-list" class="thread-list"></div>
+              <form id="thread-composer" class="composer thread-composer">
+                <input id="thread-title" type="text" placeholder="Thread title">
+                <button type="submit">Create Thread</button>
               </form>
             </aside>
 

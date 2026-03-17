@@ -213,23 +213,38 @@ button:disabled {
 
 .scope-shell {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   min-height: 640px;
 }
 
+.scope-shell.with-forum {
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+}
+
+.scope-shell.with-threads {
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+}
+
+.scope-shell.with-forum.with-threads {
+  grid-template-columns: minmax(260px, 320px) minmax(240px, 300px) minmax(0, 1fr);
+}
+
 .forum-column,
+.thread-column,
 .conversation-column {
   min-width: 0;
 }
 
-.forum-column {
+.forum-column,
+.thread-column {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-.forum-column.hidden {
+.forum-column.hidden,
+.thread-column.hidden {
   display: none;
 }
 
@@ -240,7 +255,9 @@ button:disabled {
 }
 
 .channel-list,
+.direct-list,
 .post-list,
+.thread-list,
 .messages,
 .search-results {
   display: flex;
@@ -250,7 +267,9 @@ button:disabled {
 }
 
 .channel-list,
+.direct-list,
 .post-list,
+.thread-list,
 .messages,
 .search-results,
 .summary-card {
@@ -258,24 +277,31 @@ button:disabled {
 }
 
 .channel-item,
+.direct-card,
 .post-card,
+.thread-card,
 .search-card {
   width: 100%;
   padding: 14px 15px;
   text-align: left;
 }
 
-.channel-item {
+.channel-item,
+.direct-card,
+.thread-card {
   background: var(--panel-strong);
 }
 
 .channel-item.active,
-.post-card.active {
+.direct-card.active,
+.post-card.active,
+.thread-card.active {
   border-color: var(--accent);
   background: linear-gradient(180deg, var(--accent-soft), rgba(255, 255, 255, 0.94));
 }
 
 .channel-item-top,
+.direct-card-top,
 .search-card-top,
 .message-card-top {
   display: flex;
@@ -285,6 +311,7 @@ button:disabled {
 }
 
 .channel-item-copy,
+.direct-card-copy,
 .search-card-body,
 .message-body {
   margin-top: 8px;
@@ -295,11 +322,14 @@ button:disabled {
 }
 
 .post-card-title,
+.thread-card-title,
 .message-author {
   font-weight: 700;
 }
 
 .post-card-meta,
+.direct-card-meta,
+.thread-card-meta,
 .message-meta,
 .search-card-meta,
 .scope-context span {
@@ -343,6 +373,18 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.compact-composer {
+  margin-top: auto;
+}
+
+.compact-field select[multiple] {
+  min-height: 164px;
+}
+
+.thread-parent-copy {
+  margin: 0;
 }
 
 .composer-footer {
