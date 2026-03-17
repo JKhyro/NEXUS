@@ -38,6 +38,7 @@
       "name": "Workflow",
       "kind": "shared",
       "description": "Teamwork coordination and active planning.",
+      "topic": "Purpose: teamwork coordination, active planning, execution sequencing, blockers, handoffs, and practical collaboration across the main Symbiotes. Use this for work that helps the team move. Reply constructively and avoid casual chatter, sensitive governance, database-only matters, or redundant answers. If a better lane fits, redirect there.",
       "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] }
     },
     {
@@ -47,6 +48,7 @@
       "name": "Requests",
       "kind": "shared",
       "description": "Formal asks, support requests, and planned work requests.",
+      "topic": "Purpose: project and systems requests, formal asks, action requests, review requests, support requests, and statusable work requests. Use this when someone needs action, planning, review, access, prioritization, or support on ongoing work. Include enough context to act. Avoid bug-triage noise and route runtime failures to report.",
       "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] }
     },
     {
@@ -56,6 +58,7 @@
       "name": "Report",
       "kind": "forum",
       "description": "System issue reporting and incident posts.",
+      "topic": "Purpose: problem reporting for systems in use. Use this forum for bugs, failures, breakages, incidents, unexpected behavior, diagnostics, reproduction steps, severity, impact, and mitigation. One issue per post. Include what happened, where, when, impact, and how to reproduce if known. Avoid turning this into a generic request lane.",
       "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-service"], "allowedIdentityIds": [] }
     },
     {
@@ -65,6 +68,7 @@
       "name": "General",
       "kind": "shared",
       "description": "Low-sensitivity general discussion.",
+      "topic": "Purpose: low-sensitivity general conversation. Use this for casual discussion, light check-ins, and non-sensitive thoughts that do not belong in workflow, requests, report, council, or library. Keep it safe and unspecialized. Avoid urgent work coordination, sensitive matters, or database-governance discussion.",
       "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-service"], "allowedIdentityIds": [] }
     },
     {
@@ -74,6 +78,7 @@
       "name": "Council",
       "kind": "shared",
       "description": "Sensitive governance and critical coordination discussion.",
+      "topic": "Purpose: sensitive or critical discussion for the main seven Symbiotes with Jack. Use this for high-stakes judgment, governance, conflict, risk, and delicate coordination that should not be discussed elsewhere. Be deliberate, concise, and constructive. Avoid casual chatter and routine operational noise.",
       "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] }
     },
     {
@@ -83,6 +88,7 @@
       "name": "Library",
       "kind": "shared",
       "description": "LIBRARY estate discussion, curation, and policy.",
+      "topic": "Purpose: discussion about the whole LIBRARY database estate. Use this for CHATBASE, METABASE, any other LIBRARY subdatabase, curation, retrieval, schema, placement, policy, auditability, governance, and Curator discussion with Jack or the main Symbiotes. Avoid casual chat and route general execution work to workflow, requests, or report as appropriate.",
       "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-service"], "allowedIdentityIds": [] }
     },
     {
@@ -92,6 +98,7 @@
       "name": "Kira",
       "kind": "private",
       "description": "Primary Jack and Kira coordination lane.",
+      "topic": "Purpose: primary Jack and Kira channel. Use this for direct Kira collaboration, reasoning, planning, coordination, and delegation. Kira should keep Jack in the loop and must not make profound decisions alone. Other bots do not participate here except Scriber ingestion.",
       "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-kira"] }
     },
     {
@@ -101,6 +108,7 @@
       "name": "Hera",
       "kind": "private",
       "description": "Primary Jack, Kira, and Hera strategy lane.",
+      "topic": "Purpose: primary Jack, Kira, and Hera channel. Use this for planning and strategy work with Hera, coordinated by Kira. Kira leads delegation and synthesis; Hera contributes specialist guidance. Keep Jack in the loop. Do not make profound decisions without Jack. Other bots stay out except Scriber ingestion.",
       "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-kira", "identity-hera"] }
     },
     {
@@ -110,6 +118,7 @@
       "name": "Yura",
       "kind": "private",
       "description": "Primary Jack, Kira, and Yura lane.",
+      "topic": "Purpose: primary Jack, Kira, and Yura channel. Use this for analysis, initiative, and urgent-response discussion with Yura, coordinated by Kira. Kira leads delegation and synthesis; Yura contributes specialist guidance. Keep Jack in the loop. Do not make profound decisions without Jack. Other bots stay out except Scriber ingestion.",
       "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-kira", "identity-yura"] }
     },
     {
@@ -119,6 +128,7 @@
       "name": "Aura",
       "kind": "private",
       "description": "Primary Jack, Kira, and Aura social and moral lane.",
+      "topic": "Purpose: primary Jack, Kira, and Aura channel. Use this for social, moral, interpersonal, values, tone, and human-impact discussion with Aura, coordinated by Kira. Kira leads delegation and synthesis; Aura contributes specialist guidance on ethics, tone, relationships, and social implications. Keep Jack in the loop. Do not make profound decisions without Jack. Other bots stay out except Scriber ingestion.",
       "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-kira", "identity-aura"] }
     },
     {
@@ -128,6 +138,7 @@
       "name": "Sara",
       "kind": "private",
       "description": "Primary Jack, Kira, and Sara communication lane.",
+      "topic": "Purpose: primary Jack, Kira, and Sara channel. Use this for communication, wording, framing, clarity, delivery, and messaging discussion with Sara, coordinated by Kira. Kira leads delegation and synthesis; Sara contributes specialist guidance on how things should be said and understood. Keep Jack in the loop. Do not make profound decisions without Jack. Other bots stay out except Scriber ingestion.",
       "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-kira", "identity-sara"] }
     },
     {
@@ -137,6 +148,7 @@
       "name": "Tyra",
       "kind": "private",
       "description": "Primary Jack, Kira, and Tyra moderation lane.",
+      "topic": "Purpose: primary Jack, Kira, and Tyra channel. Use this for review, moderation, stability, resource, or trajectory discussion with Tyra, coordinated by Kira. Kira leads delegation and synthesis; Tyra contributes specialist guidance. Keep Jack in the loop. Do not make profound decisions without Jack. Other bots stay out except Scriber ingestion.",
       "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-kira", "identity-tyra"] }
     },
     {
@@ -146,6 +158,7 @@
       "name": "Nora",
       "kind": "private",
       "description": "Primary Jack, Kira, and Nora stress-testing lane.",
+      "topic": "Purpose: primary Jack, Kira, and Nora channel. Use this for stress-testing plans, questioning assumptions, exploring alternative methods to achieve goals, and challenging logic with Nora, coordinated by Kira. Kira leads delegation and synthesis; Nora contributes specialist guidance by testing resilience and questioning what may be wrong or incomplete. Keep Jack in the loop. Do not make profound decisions without Jack. Other bots stay out except Scriber ingestion.",
       "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-kira", "identity-nora"] }
     },
     {
@@ -155,6 +168,7 @@
       "name": "Librarian",
       "kind": "private",
       "description": "Primary Jack and Librarian lane.",
+      "topic": "Purpose: primary Jack and Librarian channel. Use this for retrieval, sourcing, placement, curation, and navigation work across the LIBRARY estate. Keep Jack in the loop for consequential placement or authority decisions. Other bots stay out except Scriber ingestion.",
       "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-librarian"] }
     },
     {
@@ -164,6 +178,7 @@
       "name": "Arbitrian",
       "kind": "private",
       "description": "Primary Jack and Arbitrian lane.",
+      "topic": "Purpose: primary Jack and Arbitrian channel. Use this for policy, boundaries, consistency, contradiction checks, and governance-rule interpretation across the LIBRARY estate. Keep Jack in the loop for consequential boundary decisions. Other bots stay out except Scriber ingestion.",
       "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-arbitrian"] }
     },
     {
@@ -173,6 +188,7 @@
       "name": "Custodian",
       "kind": "private",
       "description": "Primary Jack and Custodian lane.",
+      "topic": "Purpose: primary Jack and Custodian channel. Use this for maintenance, integrity, housekeeping, drift checks, and operational cleanliness across the LIBRARY estate. Keep Jack in the loop for consequential corrective actions. Other bots stay out except Scriber ingestion.",
       "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-custodian"] }
     }
   ],
