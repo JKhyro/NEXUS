@@ -36,8 +36,10 @@ async function startManagedService() {
     cwd: repoRoot,
     env: {
       ...process.env,
+      NEXUS_DEPLOYMENT_MODE: 'local-managed',
       NEXUS_HOST: serviceHost,
       NEXUS_PORT: servicePort,
+      NEXUS_STATIC_MODE: 'embedded',
       NEXUS_DATA_DIR: runtimeDir
     },
     stdio: 'ignore'

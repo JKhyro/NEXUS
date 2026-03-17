@@ -9,7 +9,7 @@ It is intentionally small and internal-first. The contract is designed to power 
 ## Service shape
 
 - Protocol: HTTP + JSON
-- Authority: local workstation service in the MVP
+- Authority: local workstation service in the MVP, with a hosted-capable mode that preserves the same contract
 - Persistence: shared CHATBASE and METABASE model backed by either JSON bootstrap storage or LIBRARY-backed Postgres storage
 - Audience: internal humans and system identities only
 
@@ -69,10 +69,18 @@ It is intentionally small and internal-first. The contract is designed to power 
 ## Contract rules
 
 - `GET /api/health` must expose the active `storageMode` and safe storage labels, so desktop and future web clients can tell whether they are talking to bootstrap JSON or LIBRARY-backed persistence.
+- `GET /api/health` must also expose `deploymentMode`, `staticMode`, and any safe origin metadata needed to tell whether the service is running as a desktop-managed local surface or a hosted-capable/API-only surface.
 - Adapter payloads may contain external transport identifiers but must map into internal NEXUS objects before persistence.
 - External references never redefine the owning object; they only link outward.
 - All persisted messages generate message events in CHATBASE.
 - Attachments are first-class metadata records attached to messages.
+
+## Runtime modes
+
+- `local-managed`
+  Default desktop-first mode. Binds to localhost, serves the bundled client surface, and is intended to be managed by the desktop shell.
+- `hosted`
+  Hosted-capable mode. Uses explicit host/bind/public-origin settings, may serve the bundled client surface or run API-only, and must preserve the same endpoint contract as local-managed mode.
 
 ## MVP non-goals
 

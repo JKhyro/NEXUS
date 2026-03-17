@@ -14,8 +14,44 @@ const mimeTypes = {
   '.json': 'application/json; charset=utf-8'
 };
 
-function sendJson(response, statusCode, payload) {
-  response.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8' });
+function resolveCorsOrigin(request, config) {
+  const requestOrigin = request.headers.origin;
+  if (!requestOrigin) {
+    return null;
+  }
+
+  const allowedOrigins = new Set(config.allowedOrigins ?? []);
+  if (config.publicOrigin) {
+    allowedOrigins.add(config.publicOrigin);
+  }
+
+  if (allowedOrigins.has('*')) {
+    return '*';
+  }
+
+  if (allowedOrigins.has(requestOrigin)) {
+    return requestOrigin;
+  }
+
+  return null;
+}
+
+function buildResponseHeaders(request, config, headers = {}) {
+  const finalHeaders = { ...headers };
+  const corsOrigin = resolveCorsOrigin(request, config);
+  if (corsOrigin) {
+    finalHeaders['access-control-allow-origin'] = corsOrigin;
+    finalHeaders['access-control-allow-methods'] = 'GET,POST,OPTIONS';
+    finalHeaders['access-control-allow-headers'] = 'content-type';
+  }
+
+  return finalHeaders;
+}
+
+function sendJson(request, response, config, statusCode, payload) {
+  response.writeHead(statusCode, buildResponseHeaders(request, config, {
+    'content-type': 'application/json; charset=utf-8'
+  }));
   response.end(`${JSON.stringify(payload, null, 2)}\n`);
 }
 
@@ -30,11 +66,13 @@ async function readBody(request) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
-async function serveStatic(staticDir, pathname, response) {
+async function serveStatic(request, staticDir, pathname, response, config) {
   const resolved = pathname === '/' ? '/index.html' : pathname;
   const filePath = join(staticDir, resolved);
   const body = await readFile(filePath);
-  response.writeHead(200, { 'content-type': mimeTypes[extname(filePath)] ?? 'application/octet-stream' });
+  response.writeHead(200, buildResponseHeaders(request, config, {
+    'content-type': mimeTypes[extname(filePath)] ?? 'application/octet-stream'
+  }));
   response.end(body);
 }
 
@@ -42,11 +80,21 @@ async function routeApi(request, response, store, config) {
   const url = new URL(request.url, `http://${request.headers.host ?? `${config.host}:${config.port}`}`);
   const actorId = url.searchParams.get('actorId');
 
+  if (request.method === 'OPTIONS') {
+    response.writeHead(204, buildResponseHeaders(request, config));
+    response.end();
+    return;
+  }
+
   if (request.method === 'GET' && url.pathname === '/api/health') {
-    return sendJson(response, 200, {
+    return sendJson(request, response, config, 200, {
       status: 'ok',
       contractVersion: CONTRACT_VERSION,
-      mode: 'desktop-local-first',
+      mode: config.deploymentMode === 'hosted' ? 'hosted-capable' : 'desktop-local-first',
+      deploymentMode: config.deploymentMode,
+      staticMode: config.staticMode,
+      publicOrigin: config.publicOrigin,
+      allowedOrigins: config.allowedOrigins,
       storageMode: config.storageMode,
       storage: {
         metabasePath: store.metabasePath,
@@ -56,38 +104,38 @@ async function routeApi(request, response, store, config) {
   }
 
   if (request.method === 'GET' && url.pathname === '/api/bootstrap') {
-    return sendJson(response, 200, store.getBootstrapSummary());
+    return sendJson(request, response, config, 200, store.getBootstrapSummary());
   }
 
   if (request.method === 'GET' && url.pathname === '/api/identities') {
-    return sendJson(response, 200, store.listIdentities());
+    return sendJson(request, response, config, 200, store.listIdentities());
   }
 
   if (request.method === 'GET' && url.pathname === '/api/workspaces') {
-    return sendJson(response, 200, store.listWorkspaces(actorId));
+    return sendJson(request, response, config, 200, store.listWorkspaces(actorId));
   }
 
   if (request.method === 'GET' && url.pathname === '/api/channels') {
-    return sendJson(response, 200, store.listChannels(actorId, url.searchParams.get('workspaceId')));
+    return sendJson(request, response, config, 200, store.listChannels(actorId, url.searchParams.get('workspaceId')));
   }
 
   if (request.method === 'GET' && url.pathname === '/api/direct-conversations') {
-    return sendJson(response, 200, store.listDirectConversations(actorId));
+    return sendJson(request, response, config, 200, store.listDirectConversations(actorId));
   }
 
   if (request.method === 'GET' && url.pathname === '/api/posts') {
-    return sendJson(response, 200, store.listPosts(actorId, url.searchParams.get('channelId')));
+    return sendJson(request, response, config, 200, store.listPosts(actorId, url.searchParams.get('channelId')));
   }
 
   if (request.method === 'GET' && url.pathname === '/api/threads') {
-    return sendJson(response, 200, store.listThreads(actorId, {
+    return sendJson(request, response, config, 200, store.listThreads(actorId, {
       channelId: url.searchParams.get('channelId'),
       postId: url.searchParams.get('postId')
     }));
   }
 
   if (request.method === 'GET' && url.pathname === '/api/messages') {
-    return sendJson(response, 200, store.listMessages(
+    return sendJson(request, response, config, 200, store.listMessages(
       actorId,
       url.searchParams.get('scopeType'),
       url.searchParams.get('scopeId')
@@ -95,11 +143,11 @@ async function routeApi(request, response, store, config) {
   }
 
   if (request.method === 'GET' && url.pathname === '/api/search') {
-    return sendJson(response, 200, store.searchMessages(actorId, url.searchParams.get('q') ?? ''));
+    return sendJson(request, response, config, 200, store.searchMessages(actorId, url.searchParams.get('q') ?? ''));
   }
 
   if (request.method === 'GET' && url.pathname === '/api/external-references') {
-    return sendJson(response, 200, store.listExternalReferences(
+    return sendJson(request, response, config, 200, store.listExternalReferences(
       actorId,
       url.searchParams.get('ownerType'),
       url.searchParams.get('ownerId')
@@ -107,30 +155,30 @@ async function routeApi(request, response, store, config) {
   }
 
   if (request.method === 'POST' && url.pathname === '/api/messages') {
-    return sendJson(response, 201, await store.createMessage(await readBody(request)));
+    return sendJson(request, response, config, 201, await store.createMessage(await readBody(request)));
   }
 
   if (request.method === 'POST' && url.pathname === '/api/posts') {
-    return sendJson(response, 201, await store.createPost(await readBody(request)));
+    return sendJson(request, response, config, 201, await store.createPost(await readBody(request)));
   }
 
   if (request.method === 'POST' && url.pathname === '/api/threads') {
-    return sendJson(response, 201, await store.createThread(await readBody(request)));
+    return sendJson(request, response, config, 201, await store.createThread(await readBody(request)));
   }
 
   if (request.method === 'POST' && url.pathname === '/api/direct-conversations') {
-    return sendJson(response, 201, await store.createDirectConversation(await readBody(request)));
+    return sendJson(request, response, config, 201, await store.createDirectConversation(await readBody(request)));
   }
 
   if (request.method === 'POST' && url.pathname === '/api/external-references') {
-    return sendJson(response, 201, await store.createExternalReference(await readBody(request)));
+    return sendJson(request, response, config, 201, await store.createExternalReference(await readBody(request)));
   }
 
   if (request.method === 'POST' && url.pathname === '/api/adapters/discord/events') {
-    return sendJson(response, 201, await store.ingestDiscordEvent(await readBody(request)));
+    return sendJson(request, response, config, 201, await store.ingestDiscordEvent(await readBody(request)));
   }
 
-  return sendJson(response, 404, { error: 'Not found.' });
+  return sendJson(request, response, config, 404, { error: 'Not found.' });
 }
 
 export async function createNexusService(overrides = {}) {
@@ -145,10 +193,15 @@ export async function createNexusService(overrides = {}) {
         return;
       }
 
-      await serveStatic(config.staticDir, new URL(request.url, `http://${config.host}:${config.port}`).pathname, response);
+      if (config.staticMode === 'disabled') {
+        sendJson(request, response, config, 404, { error: 'Static client surface is disabled for this service mode.' });
+        return;
+      }
+
+      await serveStatic(request, config.staticDir, new URL(request.url, `http://${config.host}:${config.port}`).pathname, response, config);
     }
     catch (error) {
-      sendJson(response, 500, { error: error.message });
+      sendJson(request, response, config, 500, { error: error.message });
     }
   });
 

@@ -55,6 +55,8 @@ This creates three aligned surfaces:
 - shared NEXUS service contract
 - web smoke surface that proves the same contract can back a future web client
 
+The same shared service must also be able to run in a hosted-capable mode later, with explicit host/origin/runtime configuration, without forking the local-first model into a different backend.
+
 ## Product ownership boundary
 
 NEXUS owns:

@@ -266,6 +266,12 @@ test('service config can load library-postgres settings from a local config file
   const configDir = await mkdtemp(join(tmpdir(), 'nexus-config-'));
   const configPath = join(configDir, 'nexus.local.json');
   await writeFile(configPath, JSON.stringify({
+    deploymentMode: 'hosted',
+    host: '0.0.0.0',
+    port: 45210,
+    staticMode: 'disabled',
+    publicOrigin: 'https://nexus.example.invalid',
+    allowedOrigins: ['https://nexus.example.invalid', 'https://desktop.example.invalid'],
     storageMode: 'library-postgres',
     libraryConnectionString: 'postgresql://example:secret@127.0.0.1:5432/library',
     libraryChatbaseSchema: 'nexus_chatbase_cfg',
@@ -273,8 +279,54 @@ test('service config can load library-postgres settings from a local config file
   }, null, 2));
 
   const resolved = resolveServiceConfig({ configPath, port: 0 });
+  assert.equal(resolved.deploymentMode, 'hosted');
+  assert.equal(resolved.host, '0.0.0.0');
   assert.equal(resolved.storageMode, 'library-postgres');
+  assert.equal(resolved.staticMode, 'disabled');
+  assert.equal(resolved.publicOrigin, 'https://nexus.example.invalid');
+  assert.deepEqual(resolved.allowedOrigins, ['https://nexus.example.invalid', 'https://desktop.example.invalid']);
   assert.equal(resolved.libraryConnectionString, 'postgresql://example:secret@127.0.0.1:5432/library');
   assert.equal(resolved.libraryChatbaseSchema, 'nexus_chatbase_cfg');
   assert.equal(resolved.libraryMetabaseSchema, 'nexus_metabase_cfg');
+});
+
+test('service can boot in hosted mode with API-only serving and CORS', async () => {
+  const hosted = await createNexusService({
+    dataDir: await mkdtemp(join(tmpdir(), 'nexus-hosted-')),
+    port: 0,
+    storageMode: 'json',
+    deploymentMode: 'hosted',
+    host: '127.0.0.1',
+    staticMode: 'disabled',
+    publicOrigin: 'https://nexus.example.invalid',
+    allowedOrigins: ['https://nexus.example.invalid']
+  });
+
+  await hosted.start();
+  try {
+    const healthResponse = await fetch(`${hosted.url}/api/health`, {
+      headers: {
+        origin: 'https://nexus.example.invalid'
+      }
+    });
+    const health = await healthResponse.json();
+    assert.equal(health.deploymentMode, 'hosted');
+    assert.equal(health.staticMode, 'disabled');
+    assert.equal(healthResponse.headers.get('access-control-allow-origin'), 'https://nexus.example.invalid');
+
+    const options = await fetch(`${hosted.url}/api/health`, {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://nexus.example.invalid'
+      }
+    });
+    assert.equal(options.status, 204);
+    assert.equal(options.headers.get('access-control-allow-origin'), 'https://nexus.example.invalid');
+
+    const root = await fetch(`${hosted.url}/`);
+    assert.equal(root.status, 404);
+  }
+  finally {
+    await hosted.stop();
+  }
 });

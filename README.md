@@ -62,6 +62,28 @@ $env:NEXUS_LIBRARY_METABASE_SCHEMA = 'nexus_metabase'
 
 The product contract stays the same across both modes. JSON is only the bootstrap backend; LIBRARY-backed persistence is the intended long-term path.
 
+## Service runtime modes
+
+The same service can now run in two runtime shapes without forking the API model:
+
+- `local-managed`
+  The desktop-first default. The service binds to localhost, serves the bundled client surface, and is managed by the desktop shell.
+- `hosted`
+  A hosted-capable mode for non-local deployment. Host/bind/public-origin settings are explicit, CORS can be enabled for a separate web surface, and static serving can be disabled for API-only operation.
+
+Relevant config keys:
+
+```json
+{
+  "deploymentMode": "hosted",
+  "host": "0.0.0.0",
+  "port": 43100,
+  "staticMode": "disabled",
+  "publicOrigin": "https://nexus.example.invalid",
+  "allowedOrigins": ["https://nexus.example.invalid"]
+}
+```
+
 ## Current client surface
 
 The current desktop/web client can:
@@ -89,3 +111,4 @@ The importer now also carries retained Discord forum posts into native NEXUS pos
 - [CHATBASE and METABASE storage contract](docs/mvp-storage-contract.md)
 - [ANVIL integration contract](docs/anvil-integration-contract.md)
 - [Discord cutover plan](docs/discord-cutover-plan.md)
+- [Hosted service mode](docs/hosted-service-mode.md)

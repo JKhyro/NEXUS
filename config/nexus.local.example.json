@@ -1,4 +1,10 @@
 {
+  "deploymentMode": "local-managed",
+  "host": "127.0.0.1",
+  "port": 43100,
+  "staticMode": "embedded",
+  "publicOrigin": "",
+  "allowedOrigins": [],
   "storageMode": "library-postgres",
   "libraryConnectionString": "postgresql://user:password@127.0.0.1:5432/library",
   "libraryChatbaseSchema": "nexus_chatbase",
