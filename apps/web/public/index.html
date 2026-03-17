@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NEXUS</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <div class="eyebrow">NEXUS</div>
+          <h1>Internal Core</h1>
+          <p class="muted">Desktop-first, local-first communications core.</p>
+        </div>
+        <label class="field">
+          <span>Acting as</span>
+          <select id="actor"></select>
+        </label>
+        <label class="field">
+          <span>Workspace</span>
+          <select id="workspace"></select>
+        </label>
+        <label class="field">
+          <span>Search</span>
+          <input id="search" type="text" placeholder="Search visible history">
+        </label>
+        <div id="channels" class="channel-list"></div>
+      </aside>
+      <main class="content">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="eyebrow">Channel</div>
+              <h2 id="channel-title">Select a channel</h2>
+            </div>
+            <button id="refresh" type="button">Refresh</button>
+          </div>
+          <div id="messages" class="messages"></div>
+          <form id="composer" class="composer">
+            <textarea id="message-body" rows="4" placeholder="Write a message into the selected scope"></textarea>
+            <button type="submit">Send</button>
+          </form>
+        </section>
+        <section class="panel slim">
+          <div class="panel-header">
+            <div>
+              <div class="eyebrow">Contract</div>
+              <h2>Health</h2>
+            </div>
+          </div>
+          <pre id="health"></pre>
+          <div class="panel-header">
+            <div>
+              <div class="eyebrow">Search</div>
+              <h2>Visible matches</h2>
+            </div>
+          </div>
+          <div id="search-results" class="search-results"></div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/app.js"></script>
+  </body>
+  </html>

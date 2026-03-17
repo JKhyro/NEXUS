@@ -1,0 +1,212 @@
+{
+  "roles": [
+    { "id": "role-operator", "slug": "operator", "name": "Operator", "identityKind": "human" },
+    { "id": "role-symbiote", "slug": "symbiote", "name": "Symbiote", "identityKind": "symbiote" },
+    { "id": "role-curator", "slug": "curator", "name": "Curator", "identityKind": "curator" },
+    { "id": "role-collector", "slug": "collector", "name": "Collector", "identityKind": "collector" },
+    { "id": "role-service", "slug": "service", "name": "System Service", "identityKind": "system-service" }
+  ],
+  "identities": [
+    { "id": "identity-jack", "slug": "jack", "displayName": "Jack", "kind": "human" },
+    { "id": "identity-kira", "slug": "kira", "displayName": "Kira", "kind": "symbiote" },
+    { "id": "identity-hera", "slug": "hera", "displayName": "Hera", "kind": "symbiote" },
+    { "id": "identity-yura", "slug": "yura", "displayName": "Yura", "kind": "symbiote" },
+    { "id": "identity-aura", "slug": "aura", "displayName": "Aura", "kind": "symbiote" },
+    { "id": "identity-sara", "slug": "sara", "displayName": "Sara", "kind": "symbiote" },
+    { "id": "identity-tyra", "slug": "tyra", "displayName": "Tyra", "kind": "symbiote" },
+    { "id": "identity-nora", "slug": "nora", "displayName": "Nora", "kind": "symbiote" },
+    { "id": "identity-librarian", "slug": "librarian", "displayName": "Librarian", "kind": "curator" },
+    { "id": "identity-arbitrian", "slug": "arbitrian", "displayName": "Arbitrian", "kind": "curator" },
+    { "id": "identity-custodian", "slug": "custodian", "displayName": "Custodian", "kind": "curator" },
+    { "id": "identity-scriber", "slug": "scriber", "displayName": "Scriber", "kind": "collector" },
+    { "id": "identity-paladin", "slug": "paladin", "displayName": "Paladin", "kind": "system-service" }
+  ],
+  "workspaces": [
+    {
+      "id": "workspace-internal-core",
+      "slug": "internal-core",
+      "name": "Internal Core",
+      "description": "Primary internal communication surface for Jack, Symbiotes, Curators, and support systems.",
+      "visibility": "internal"
+    }
+  ],
+  "channels": [
+    {
+      "id": "channel-workflow",
+      "workspaceId": "workspace-internal-core",
+      "slug": "workflow",
+      "name": "Workflow",
+      "kind": "shared",
+      "description": "Teamwork coordination and active planning.",
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] }
+    },
+    {
+      "id": "channel-requests",
+      "workspaceId": "workspace-internal-core",
+      "slug": "requests",
+      "name": "Requests",
+      "kind": "shared",
+      "description": "Formal asks, support requests, and planned work requests.",
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] }
+    },
+    {
+      "id": "channel-report",
+      "workspaceId": "workspace-internal-core",
+      "slug": "report",
+      "name": "Report",
+      "kind": "forum",
+      "description": "System issue reporting and incident posts.",
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-service"], "allowedIdentityIds": [] }
+    },
+    {
+      "id": "channel-general",
+      "workspaceId": "workspace-internal-core",
+      "slug": "general",
+      "name": "General",
+      "kind": "shared",
+      "description": "Low-sensitivity general discussion.",
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-service"], "allowedIdentityIds": [] }
+    },
+    {
+      "id": "channel-council",
+      "workspaceId": "workspace-internal-core",
+      "slug": "council",
+      "name": "Council",
+      "kind": "shared",
+      "description": "Sensitive governance and critical coordination discussion.",
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] }
+    },
+    {
+      "id": "channel-library",
+      "workspaceId": "workspace-internal-core",
+      "slug": "library",
+      "name": "Library",
+      "kind": "shared",
+      "description": "LIBRARY estate discussion, curation, and policy.",
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-service"], "allowedIdentityIds": [] }
+    },
+    {
+      "id": "channel-kira",
+      "workspaceId": "workspace-internal-core",
+      "slug": "kira",
+      "name": "Kira",
+      "kind": "private",
+      "description": "Primary Jack and Kira coordination lane.",
+      "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-kira"] }
+    },
+    {
+      "id": "channel-hera",
+      "workspaceId": "workspace-internal-core",
+      "slug": "hera",
+      "name": "Hera",
+      "kind": "private",
+      "description": "Primary Jack, Kira, and Hera strategy lane.",
+      "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-kira", "identity-hera"] }
+    },
+    {
+      "id": "channel-yura",
+      "workspaceId": "workspace-internal-core",
+      "slug": "yura",
+      "name": "Yura",
+      "kind": "private",
+      "description": "Primary Jack, Kira, and Yura lane.",
+      "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-kira", "identity-yura"] }
+    },
+    {
+      "id": "channel-aura",
+      "workspaceId": "workspace-internal-core",
+      "slug": "aura",
+      "name": "Aura",
+      "kind": "private",
+      "description": "Primary Jack, Kira, and Aura social and moral lane.",
+      "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-kira", "identity-aura"] }
+    },
+    {
+      "id": "channel-sara",
+      "workspaceId": "workspace-internal-core",
+      "slug": "sara",
+      "name": "Sara",
+      "kind": "private",
+      "description": "Primary Jack, Kira, and Sara communication lane.",
+      "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-kira", "identity-sara"] }
+    },
+    {
+      "id": "channel-tyra",
+      "workspaceId": "workspace-internal-core",
+      "slug": "tyra",
+      "name": "Tyra",
+      "kind": "private",
+      "description": "Primary Jack, Kira, and Tyra moderation lane.",
+      "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-kira", "identity-tyra"] }
+    },
+    {
+      "id": "channel-nora",
+      "workspaceId": "workspace-internal-core",
+      "slug": "nora",
+      "name": "Nora",
+      "kind": "private",
+      "description": "Primary Jack, Kira, and Nora stress-testing lane.",
+      "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-kira", "identity-nora"] }
+    },
+    {
+      "id": "channel-librarian",
+      "workspaceId": "workspace-internal-core",
+      "slug": "librarian",
+      "name": "Librarian",
+      "kind": "private",
+      "description": "Primary Jack and Librarian lane.",
+      "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-librarian"] }
+    },
+    {
+      "id": "channel-arbitrian",
+      "workspaceId": "workspace-internal-core",
+      "slug": "arbitrian",
+      "name": "Arbitrian",
+      "kind": "private",
+      "description": "Primary Jack and Arbitrian lane.",
+      "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-arbitrian"] }
+    },
+    {
+      "id": "channel-custodian",
+      "workspaceId": "workspace-internal-core",
+      "slug": "custodian",
+      "name": "Custodian",
+      "kind": "private",
+      "description": "Primary Jack and Custodian lane.",
+      "access": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-custodian"] }
+    }
+  ],
+  "memberships": [
+    { "id": "membership-jack-internal", "scopeType": "workspace", "scopeId": "workspace-internal-core", "identityId": "identity-jack", "roleIds": ["role-operator"] },
+    { "id": "membership-kira-internal", "scopeType": "workspace", "scopeId": "workspace-internal-core", "identityId": "identity-kira", "roleIds": ["role-symbiote"] },
+    { "id": "membership-hera-internal", "scopeType": "workspace", "scopeId": "workspace-internal-core", "identityId": "identity-hera", "roleIds": ["role-symbiote"] },
+    { "id": "membership-yura-internal", "scopeType": "workspace", "scopeId": "workspace-internal-core", "identityId": "identity-yura", "roleIds": ["role-symbiote"] },
+    { "id": "membership-aura-internal", "scopeType": "workspace", "scopeId": "workspace-internal-core", "identityId": "identity-aura", "roleIds": ["role-symbiote"] },
+    { "id": "membership-sara-internal", "scopeType": "workspace", "scopeId": "workspace-internal-core", "identityId": "identity-sara", "roleIds": ["role-symbiote"] },
+    { "id": "membership-tyra-internal", "scopeType": "workspace", "scopeId": "workspace-internal-core", "identityId": "identity-tyra", "roleIds": ["role-symbiote"] },
+    { "id": "membership-nora-internal", "scopeType": "workspace", "scopeId": "workspace-internal-core", "identityId": "identity-nora", "roleIds": ["role-symbiote"] },
+    { "id": "membership-librarian-internal", "scopeType": "workspace", "scopeId": "workspace-internal-core", "identityId": "identity-librarian", "roleIds": ["role-curator"] },
+    { "id": "membership-arbitrian-internal", "scopeType": "workspace", "scopeId": "workspace-internal-core", "identityId": "identity-arbitrian", "roleIds": ["role-curator"] },
+    { "id": "membership-custodian-internal", "scopeType": "workspace", "scopeId": "workspace-internal-core", "identityId": "identity-custodian", "roleIds": ["role-curator"] },
+    { "id": "membership-scriber-internal", "scopeType": "workspace", "scopeId": "workspace-internal-core", "identityId": "identity-scriber", "roleIds": ["role-collector"] },
+    { "id": "membership-paladin-internal", "scopeType": "workspace", "scopeId": "workspace-internal-core", "identityId": "identity-paladin", "roleIds": ["role-service"] }
+  ],
+  "directConversations": [],
+  "adapterEndpoints": [
+    {
+      "id": "adapter-discord-primary",
+      "system": "discord",
+      "direction": "ingest-relay",
+      "workspaceId": "workspace-internal-core",
+      "channelMappings": [
+        { "externalChannelId": "discord-workflow", "channelId": "channel-workflow" },
+        { "externalChannelId": "discord-requests", "channelId": "channel-requests" },
+        { "externalChannelId": "discord-report", "channelId": "channel-report" },
+        { "externalChannelId": "discord-general", "channelId": "channel-general" },
+        { "externalChannelId": "discord-council", "channelId": "channel-council" },
+        { "externalChannelId": "discord-library", "channelId": "channel-library" },
+        { "externalChannelId": "discord-kira", "channelId": "channel-kira" }
+      ]
+    }
+  ]
+}

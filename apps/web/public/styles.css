@@ -1,0 +1,177 @@
+:root {
+  color-scheme: light;
+  --bg: #edf3f1;
+  --panel: rgba(255, 255, 255, 0.9);
+  --ink: #152321;
+  --muted: #59706a;
+  --line: rgba(21, 35, 33, 0.12);
+  --accent: #145d4a;
+  --accent-soft: rgba(20, 93, 74, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Aptos", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(20, 93, 74, 0.16), transparent 32%),
+    linear-gradient(180deg, #f7fbfa 0%, var(--bg) 100%);
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar,
+.panel {
+  backdrop-filter: blur(16px);
+  background: var(--panel);
+}
+
+.sidebar {
+  border-right: 1px solid var(--line);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  padding: 24px;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel.slim {
+  min-width: 0;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+h1,
+h2 {
+  margin: 4px 0 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 600;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  padding: 12px 14px;
+  background: white;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+}
+
+.channel-list,
+.messages,
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.channel-item,
+.message,
+.search-item {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: white;
+}
+
+.channel-item.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.channel-item button {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.message-meta,
+.search-meta {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 1100px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .content {
+    grid-template-columns: 1fr;
+  }
+}

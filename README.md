@@ -1,6 +1,15 @@
 # NEXUS
 
-NEXUS is the future in-house communications and coordination platform for humans, Symbiotes, Curators, projects, and supporting systems.
+NEXUS is the in-house communications and coordination product that replaces Discord for internal humans, Symbiotes, Curators, and supporting systems.
+
+## MVP direction
+
+- Desktop-first and local-first
+- Managed local NEXUS service on the workstation
+- Shared service contract for desktop now and web later
+- Communications core only in the first executable MVP
+- Tight early coupling with `ANVIL`
+- Discord treated as a temporary adapter, not the product model
 
 ## Product stack
 
@@ -9,13 +18,32 @@ NEXUS is the future in-house communications and coordination platform for humans
 - Communications/event record layer: `CHATBASE`
 - Metadata, registry, and policy layer: `METABASE`
 
-## Current direction
+## Repo layout
 
-- Replace Discord deliberately over time rather than treating it as the permanent product surface.
-- Design for both a web UI and a desktop UI from the beginning.
-- Keep adapters at the edge and let NEXUS own conversation and work semantics.
-- Enforce access policy above retained storage so CHATBASE does not become a permissions bypass.
+- `apps/service`
+  Local NEXUS service with REST endpoints, bootstrap loading, CHATBASE/METABASE scaffolding, and adapter ingress.
+- `apps/desktop`
+  Desktop shell that manages the local service and loads the local web surface.
+- `apps/web`
+  Browser-facing smoke surface that uses the same service contract.
+- `packages/contracts`
+  Shared entity kinds and input validators for the MVP contract.
+- `config/internal-bootstrap.json`
+  Greenfield internal channel and workspace bootstrap for private and shared spaces.
 
-## Current architecture record
+## Commands
+
+```powershell
+npm install
+npm run service:start
+npm run desktop:start
+npm test
+```
+
+## Architecture records
 
 - [First-pass architecture brief](docs/first-pass-architecture.md)
+- [MVP service contract](docs/mvp-service-contract.md)
+- [CHATBASE and METABASE storage contract](docs/mvp-storage-contract.md)
+- [ANVIL integration contract](docs/anvil-integration-contract.md)
+- [Discord cutover plan](docs/discord-cutover-plan.md)
