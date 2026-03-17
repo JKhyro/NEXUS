@@ -152,6 +152,114 @@ test('ANVIL references can attach to readable messages', async () => {
   });
 });
 
+test('external references can attach to channel, post, thread, and direct owners', async () => {
+  await withService(async (service) => {
+    const post = await fetch(`${service.url}/api/posts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        channelId: 'channel-report',
+        title: 'Reference owner post',
+        body: 'Open a post for reference ownership checks.'
+      })
+    }).then((response) => response.json());
+
+    const thread = await fetch(`${service.url}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        postId: post.post.id,
+        title: 'Reference owner thread'
+      })
+    }).then((response) => response.json());
+
+    const directConversation = await fetch(`${service.url}/api/direct-conversations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        memberIdentityIds: ['identity-jack', 'identity-kira']
+      })
+    }).then((response) => response.json());
+
+    await fetch(`${service.url}/api/external-references`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        ownerType: 'channel',
+        ownerId: 'channel-requests',
+        system: 'github',
+        relationType: 'tracks',
+        externalId: 'JKhyro/NEXUS#29',
+        url: 'https://github.com/JKhyro/NEXUS/issues/29',
+        title: 'Attachment follow-up issue'
+      })
+    });
+
+    await fetch(`${service.url}/api/external-references`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        ownerType: 'post',
+        ownerId: post.post.id,
+        system: 'anvil',
+        relationType: 'relatesTo',
+        externalId: 'ANVIL-77',
+        url: 'https://example.invalid/anvil/77',
+        title: 'Post context'
+      })
+    });
+
+    await fetch(`${service.url}/api/external-references`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        ownerType: 'thread',
+        ownerId: thread.id,
+        system: 'github',
+        relationType: 'implements',
+        externalId: 'JKhyro/NEXUS#30',
+        url: 'https://github.com/JKhyro/NEXUS/issues/30',
+        title: 'Thread implementation'
+      })
+    });
+
+    await fetch(`${service.url}/api/external-references`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-kira',
+        ownerType: 'direct',
+        ownerId: directConversation.id,
+        system: 'discord',
+        relationType: 'mirrors',
+        externalId: 'discord-direct-123',
+        url: 'https://discord.com/channels/example',
+        title: 'Legacy direct mirror'
+      })
+    });
+
+    const channelReferences = await fetch(`${service.url}/api/external-references?actorId=identity-jack&ownerType=channel&ownerId=channel-requests`).then((response) => response.json());
+    const postReferences = await fetch(`${service.url}/api/external-references?actorId=identity-jack&ownerType=post&ownerId=${post.post.id}`).then((response) => response.json());
+    const threadReferences = await fetch(`${service.url}/api/external-references?actorId=identity-jack&ownerType=thread&ownerId=${thread.id}`).then((response) => response.json());
+    const directReferences = await fetch(`${service.url}/api/external-references?actorId=identity-kira&ownerType=direct&ownerId=${directConversation.id}`).then((response) => response.json());
+
+    assert.equal(channelReferences.length, 1);
+    assert.equal(channelReferences[0].system, 'github');
+    assert.equal(postReferences.length, 1);
+    assert.equal(postReferences[0].system, 'anvil');
+    assert.equal(threadReferences.length, 1);
+    assert.equal(threadReferences[0].relationType, 'implements');
+    assert.equal(directReferences.length, 1);
+    assert.equal(directReferences[0].system, 'discord');
+  });
+});
+
 test('messages expose inline attachments through read and search flows', async () => {
   await withService(async (service) => {
     const created = await fetch(`${service.url}/api/messages`, {

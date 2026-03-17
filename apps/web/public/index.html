@@ -137,6 +137,56 @@
 
           <div class="panel-header">
             <div>
+              <div class="eyebrow">References</div>
+              <h2>External Context</h2>
+            </div>
+          </div>
+          <div class="reference-section">
+            <div class="reference-group">
+              <div class="reference-group-header">
+                <strong>Current scope</strong>
+                <span id="scope-reference-copy" class="muted">Select a scope to load its references.</span>
+              </div>
+              <div id="scope-references" class="reference-list"></div>
+            </div>
+            <div class="reference-group">
+              <div class="reference-group-header">
+                <strong>Selected message</strong>
+                <span id="message-reference-copy" class="muted">Select a message to inspect message-level references.</span>
+              </div>
+              <div id="message-references" class="reference-list"></div>
+            </div>
+            <form id="reference-composer" class="composer compact-composer">
+              <label class="field compact-field">
+                <span>Attach reference to</span>
+                <select id="reference-owner"></select>
+              </label>
+              <label class="field compact-field">
+                <span>System</span>
+                <select id="reference-system"></select>
+              </label>
+              <label class="field compact-field">
+                <span>Relation</span>
+                <select id="reference-relation"></select>
+              </label>
+              <label class="field compact-field">
+                <span>External ID</span>
+                <input id="reference-external-id" type="text" placeholder="ANVIL-42 or repo#123">
+              </label>
+              <label class="field compact-field">
+                <span>URL</span>
+                <input id="reference-url" type="text" placeholder="https://example.invalid/reference">
+              </label>
+              <label class="field compact-field">
+                <span>Title</span>
+                <input id="reference-title" type="text" placeholder="Human-readable title">
+              </label>
+              <button id="reference-submit" type="submit">Create External Reference</button>
+            </form>
+          </div>
+
+          <div class="panel-header">
+            <div>
               <div class="eyebrow">Search</div>
               <h2>Visible matches</h2>
             </div>

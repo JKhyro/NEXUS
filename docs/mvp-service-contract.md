@@ -71,6 +71,7 @@ It is intentionally small and internal-first. The contract is designed to power 
 - `GET /api/health` must expose the active `storageMode` and safe storage labels, so desktop and future web clients can tell whether they are talking to bootstrap JSON or LIBRARY-backed persistence.
 - `GET /api/health` must also expose `deploymentMode`, `staticMode`, and any safe origin metadata needed to tell whether the service is running as a desktop-managed local surface or a hosted-capable/API-only surface.
 - `POST /api/messages` and `POST /api/posts` may carry inline `attachments` arrays so composition stays on the shared message contract instead of depending on a separate upload/session model in the MVP.
+- `GET /api/external-references` and `POST /api/external-references` must work uniformly for scope owners (`channel`, `post`, `thread`, `direct`) and message owners so desktop and future web clients do not fork their reference model.
 - Adapter payloads may contain external transport identifiers but must map into internal NEXUS objects before persistence.
 - External references never redefine the owning object; they only link outward.
 - All persisted messages generate message events in CHATBASE.

@@ -33,7 +33,22 @@ const healthEl = document.querySelector('#health');
 const searchEl = document.querySelector('#search');
 const searchResultsEl = document.querySelector('#search-results');
 const scopeSummaryEl = document.querySelector('#scope-summary');
+const scopeReferenceCopyEl = document.querySelector('#scope-reference-copy');
+const scopeReferencesEl = document.querySelector('#scope-references');
+const messageReferenceCopyEl = document.querySelector('#message-reference-copy');
+const messageReferencesEl = document.querySelector('#message-references');
+const referenceComposerEl = document.querySelector('#reference-composer');
+const referenceOwnerEl = document.querySelector('#reference-owner');
+const referenceSystemEl = document.querySelector('#reference-system');
+const referenceRelationEl = document.querySelector('#reference-relation');
+const referenceExternalIdEl = document.querySelector('#reference-external-id');
+const referenceUrlEl = document.querySelector('#reference-url');
+const referenceTitleEl = document.querySelector('#reference-title');
+const referenceSubmitEl = document.querySelector('#reference-submit');
 const statusEl = document.querySelector('#status');
+
+const externalReferenceSystems = ['anvil', 'github', 'discord'];
+const externalReferenceRelations = ['tracks', 'blocks', 'implements', 'reportedBy', 'relatesTo', 'mirrors'];
 
 const state = {
   identities: [],
@@ -45,10 +60,13 @@ const state = {
   threadsByParentKey: new Map(),
   threadParentIndex: new Map(),
   messages: [],
+  scopeExternalReferences: [],
+  messageExternalReferences: [],
   selectedChannelId: null,
   selectedDirectConversationId: null,
   selectedPostId: null,
   selectedThreadId: null,
+  selectedMessageId: null,
   selectedScope: null,
   health: null
 };
@@ -153,6 +171,10 @@ function currentThreads() {
 
 function currentThread() {
   return currentThreads().find((thread) => thread.id === state.selectedThreadId) ?? null;
+}
+
+function currentMessage() {
+  return state.messages.find((message) => message.id === state.selectedMessageId) ?? null;
 }
 
 function currentScopeLabel() {
@@ -349,6 +371,100 @@ function clearAttachmentDrafts(container) {
   syncAttachmentDraftPlaceholder(container);
 }
 
+function referenceOwnerValue(ownerType, ownerId) {
+  return `${ownerType}:${ownerId}`;
+}
+
+function parseReferenceOwnerValue(value) {
+  const separator = value.indexOf(':');
+  if (separator === -1) {
+    return null;
+  }
+
+  return {
+    ownerType: value.slice(0, separator),
+    ownerId: value.slice(separator + 1)
+  };
+}
+
+function currentReferenceOwners() {
+  const owners = [];
+  if (state.selectedScope) {
+    owners.push({
+      value: referenceOwnerValue(state.selectedScope.scopeType, state.selectedScope.scopeId),
+      label: `Current scope (${currentScopeLabel()})`
+    });
+  }
+
+  const message = currentMessage();
+  if (message) {
+    owners.push({
+      value: referenceOwnerValue('message', message.id),
+      label: `Selected message (${actorName(message.authorIdentityId)})`
+    });
+  }
+
+  return owners;
+}
+
+function renderReferenceOwnerOptions() {
+  const previousValue = referenceOwnerEl.value;
+  const owners = currentReferenceOwners();
+  referenceOwnerEl.innerHTML = '';
+
+  for (const owner of owners) {
+    const option = document.createElement('option');
+    option.value = owner.value;
+    option.textContent = owner.label;
+    referenceOwnerEl.appendChild(option);
+  }
+
+  if (!owners.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'No selectable owner';
+    referenceOwnerEl.appendChild(option);
+  }
+
+  referenceOwnerEl.value = owners.some((owner) => owner.value === previousValue)
+    ? previousValue
+    : owners[0]?.value ?? '';
+  referenceOwnerEl.disabled = owners.length === 0;
+  referenceSubmitEl.disabled = owners.length === 0;
+}
+
+function renderReferenceCards(container, references, emptyText) {
+  container.innerHTML = '';
+  if (!references.length) {
+    container.innerHTML = `<div class="empty-state">${escapeHtml(emptyText)}</div>`;
+    return;
+  }
+
+  for (const reference of references) {
+    const card = document.createElement('article');
+    card.className = 'reference-card';
+    const href = safeAttachmentHref(reference.url);
+    card.innerHTML = `
+      <div class="reference-card-top">
+        <strong>${escapeHtml(reference.title)}</strong>
+        <span class="pill">${escapeHtml(reference.system)}</span>
+      </div>
+      <div class="reference-card-meta">${escapeHtml(reference.relationType)} | ${escapeHtml(reference.externalId)}</div>
+      ${href
+        ? `<a class="reference-link" href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${escapeHtml(reference.url)}</a>`
+        : `<div class="reference-link muted">${escapeHtml(reference.url)}</div>`}
+      <div class="reference-card-meta">Created by ${escapeHtml(actorName(reference.createdByIdentityId))} | ${escapeHtml(formatTimestamp(reference.createdAt))}</div>
+    `;
+    container.appendChild(card);
+  }
+}
+
+function clearReferenceComposer() {
+  referenceExternalIdEl.value = '';
+  referenceUrlEl.value = '';
+  referenceTitleEl.value = '';
+}
+
 function directConversationLabel(conversation) {
   const otherMembers = conversation.memberIdentityIds.filter((identityId) => identityId !== selectedActor());
   const names = (otherMembers.length > 0 ? otherMembers : conversation.memberIdentityIds).map((identityId) => actorName(identityId));
@@ -531,7 +647,7 @@ function renderMessages() {
 
   for (const message of state.messages) {
     const article = document.createElement('article');
-    article.className = 'message-card';
+    article.className = `message-card${state.selectedMessageId === message.id ? ' active' : ''}`;
     const sourceSystem = message.source?.system ?? 'nexus';
     const sourcedFromDiscord = sourceSystem === 'discord';
     article.innerHTML = `
@@ -545,8 +661,35 @@ function renderMessages() {
       <div class="message-body">${message.body ? escapeHtml(message.body) : '<span class="muted">Empty message body.</span>'}</div>
       ${renderAttachmentMarkup(message.attachments)}
     `;
+    article.addEventListener('click', async () => {
+      state.selectedMessageId = message.id;
+      await loadExternalReferences();
+      renderAll();
+    });
     messagesEl.appendChild(article);
   }
+}
+
+function renderExternalReferences() {
+  const message = currentMessage();
+  scopeReferenceCopyEl.textContent = state.selectedScope
+    ? `${currentScopeLabel()} | ${state.scopeExternalReferences.length} reference${state.scopeExternalReferences.length === 1 ? '' : 's'}`
+    : 'Select a scope to load its references.';
+  messageReferenceCopyEl.textContent = message
+    ? `${actorName(message.authorIdentityId)} | ${state.messageExternalReferences.length} reference${state.messageExternalReferences.length === 1 ? '' : 's'}`
+    : 'Select a message to inspect message-level references.';
+
+  renderReferenceCards(
+    scopeReferencesEl,
+    state.scopeExternalReferences,
+    'No external references are attached to the current scope yet.'
+  );
+  renderReferenceCards(
+    messageReferencesEl,
+    state.messageExternalReferences,
+    'No external references are attached to the selected message yet.'
+  );
+  renderReferenceOwnerOptions();
 }
 
 function renderScopeSummary() {
@@ -568,6 +711,7 @@ function renderScopeSummary() {
     summaryLines.push(`<strong>Members</strong><span>${escapeHtml(directConversationMembers(directConversation))}</span>`);
     summaryLines.push(`<strong>Scope</strong><span>${escapeHtml(state.selectedScope ? `${state.selectedScope.scopeType}:${state.selectedScope.scopeId}` : 'none')}</span>`);
     summaryLines.push(`<strong>Visible Messages</strong><span>${escapeHtml(state.messages.length)}</span>`);
+    summaryLines.push(`<strong>Scope References</strong><span>${escapeHtml(state.scopeExternalReferences.length)}</span>`);
   }
   else {
     summaryLines.push(`<strong>Channel</strong><span>${escapeHtml(channel.name)}</span>`);
@@ -576,6 +720,7 @@ function renderScopeSummary() {
     summaryLines.push(`<strong>Visible Posts</strong><span>${escapeHtml(channel.kind === 'forum' ? currentPosts().length : 0)}</span>`);
     summaryLines.push(`<strong>Visible Threads</strong><span>${escapeHtml(currentThreads().length)}</span>`);
     summaryLines.push(`<strong>Visible Messages</strong><span>${escapeHtml(state.messages.length)}</span>`);
+    summaryLines.push(`<strong>Scope References</strong><span>${escapeHtml(state.scopeExternalReferences.length)}</span>`);
 
     if (post?.source?.system === 'discord') {
       summaryLines.push(`<strong>Imported From</strong><span>${escapeHtml(`Discord forum thread ${post.source.externalChannelId}`)}</span>`);
@@ -584,6 +729,11 @@ function renderScopeSummary() {
     if (thread) {
       summaryLines.push(`<strong>Thread</strong><span>${escapeHtml(thread.title)}</span>`);
     }
+  }
+
+  if (currentMessage()) {
+    summaryLines.push(`<strong>Selected Message</strong><span>${escapeHtml(actorName(currentMessage().authorIdentityId))}</span>`);
+    summaryLines.push(`<strong>Message References</strong><span>${escapeHtml(state.messageExternalReferences.length)}</span>`);
   }
 
   scopeSummaryEl.className = 'summary-card';
@@ -671,6 +821,13 @@ function updateComposerState() {
 
   threadTitleEl.disabled = !threadParent;
   threadComposerEl.querySelector('button').disabled = !threadParent;
+  referenceOwnerEl.disabled = !currentReferenceOwners().length;
+  referenceSystemEl.disabled = !currentReferenceOwners().length;
+  referenceRelationEl.disabled = !currentReferenceOwners().length;
+  referenceExternalIdEl.disabled = !currentReferenceOwners().length;
+  referenceUrlEl.disabled = !currentReferenceOwners().length;
+  referenceTitleEl.disabled = !currentReferenceOwners().length;
+  referenceSubmitEl.disabled = !currentReferenceOwners().length;
 
   if (!channel && !directConversation) {
     composerHintEl.textContent = 'Select a channel or direct conversation to compose.';
@@ -879,6 +1036,27 @@ async function loadMessagesForScope(scopeType, scopeId) {
   state.messages = await getJson(`/api/messages?actorId=${encodeURIComponent(selectedActor())}&scopeType=${encodeURIComponent(scopeType)}&scopeId=${encodeURIComponent(scopeId)}`);
 }
 
+async function loadExternalReferences() {
+  if (state.selectedScope) {
+    state.scopeExternalReferences = await getJson(
+      `/api/external-references?actorId=${encodeURIComponent(selectedActor())}&ownerType=${encodeURIComponent(state.selectedScope.scopeType)}&ownerId=${encodeURIComponent(state.selectedScope.scopeId)}`
+    );
+  }
+  else {
+    state.scopeExternalReferences = [];
+  }
+
+  const message = currentMessage();
+  if (message) {
+    state.messageExternalReferences = await getJson(
+      `/api/external-references?actorId=${encodeURIComponent(selectedActor())}&ownerType=message&ownerId=${encodeURIComponent(message.id)}`
+    );
+  }
+  else {
+    state.messageExternalReferences = [];
+  }
+}
+
 function renderAll() {
   renderScopeShell();
   renderChannels();
@@ -886,6 +1064,7 @@ function renderAll() {
   renderPosts();
   renderThreads();
   renderMessages();
+  renderExternalReferences();
   renderScopeHeader();
   renderScopeSummary();
   updateComposerState();
@@ -902,6 +1081,10 @@ async function syncSelection() {
       scopeId: directConversation.id
     };
     await loadMessagesForScope('direct', directConversation.id);
+    if (!state.messages.some((message) => message.id === state.selectedMessageId)) {
+      state.selectedMessageId = null;
+    }
+    await loadExternalReferences();
     renderAll();
     return;
   }
@@ -910,6 +1093,8 @@ async function syncSelection() {
   if (!channel) {
     state.selectedScope = null;
     state.messages = [];
+    state.selectedMessageId = null;
+    await loadExternalReferences();
     renderAll();
     return;
   }
@@ -970,6 +1155,10 @@ async function syncSelection() {
     }
   }
 
+  if (!state.messages.some((message) => message.id === state.selectedMessageId)) {
+    state.selectedMessageId = null;
+  }
+  await loadExternalReferences();
   renderAll();
 }
 
@@ -1124,6 +1313,7 @@ actorSelect.addEventListener('change', async () => {
   state.selectedDirectConversationId = null;
   state.selectedPostId = null;
   state.selectedThreadId = null;
+  state.selectedMessageId = null;
   await loadWorkspaces();
   await refreshAll();
 });
@@ -1132,6 +1322,7 @@ workspaceSelect.addEventListener('change', async () => {
   state.selectedChannelId = null;
   state.selectedPostId = null;
   state.selectedThreadId = null;
+  state.selectedMessageId = null;
   await refreshAll();
 });
 
@@ -1155,8 +1346,54 @@ searchEl.addEventListener('input', () => {
   });
 });
 
+referenceComposerEl.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const owner = parseReferenceOwnerValue(referenceOwnerEl.value);
+  if (!owner) {
+    setStatus('Select a scope or message before creating an external reference.', 'error');
+    return;
+  }
+
+  if (!referenceExternalIdEl.value.trim() || !referenceUrlEl.value.trim() || !referenceTitleEl.value.trim()) {
+    setStatus('External references need an external ID, URL, and title.', 'error');
+    return;
+  }
+
+  try {
+    await postJson('/api/external-references', {
+      actorId: selectedActor(),
+      ownerType: owner.ownerType,
+      ownerId: owner.ownerId,
+      system: referenceSystemEl.value,
+      relationType: referenceRelationEl.value,
+      externalId: referenceExternalIdEl.value.trim(),
+      url: referenceUrlEl.value.trim(),
+      title: referenceTitleEl.value.trim()
+    });
+    clearReferenceComposer();
+    await loadExternalReferences();
+    renderAll();
+    setStatus(`Created external reference on ${owner.ownerType}.`, 'success');
+  }
+  catch (error) {
+    setStatus(error.message, 'error');
+  }
+});
+
 syncAttachmentDraftPlaceholder(postAttachmentListEl);
 syncAttachmentDraftPlaceholder(messageAttachmentListEl);
+for (const system of externalReferenceSystems) {
+  const option = document.createElement('option');
+  option.value = system;
+  option.textContent = system.toUpperCase();
+  referenceSystemEl.appendChild(option);
+}
+for (const relation of externalReferenceRelations) {
+  const option = document.createElement('option');
+  option.value = relation;
+  option.textContent = relation;
+  referenceRelationEl.appendChild(option);
+}
 await loadIdentities();
 await loadWorkspaces();
 await refreshAll();
