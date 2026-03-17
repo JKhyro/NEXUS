@@ -4,6 +4,7 @@ import { LibraryPostgresStore } from './library-postgres-store.mjs';
 import { resolveServiceConfig } from './config.mjs';
 
 const { Client } = pg;
+const discordThreadChannelTypes = new Set(['11', '12', '15']);
 
 function normalizeIdentityValue(value) {
   return String(value ?? '').trim().toLowerCase();
@@ -13,6 +14,25 @@ function slugify(value) {
   return normalizeIdentityValue(value)
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'discord-identity';
+}
+
+function normalizePatternList(list) {
+  return (list ?? [])
+    .map((entry) => normalizeIdentityValue(entry))
+    .filter(Boolean);
+}
+
+function textMatchesPatterns(value, patterns) {
+  if (patterns.length === 0) {
+    return false;
+  }
+
+  const normalized = normalizeIdentityValue(value);
+  if (!normalized) {
+    return false;
+  }
+
+  return patterns.some((pattern) => normalized.includes(pattern));
 }
 
 export function buildDiscordChannelMap(metabase) {
@@ -28,6 +48,52 @@ export function buildDiscordChannelMap(metabase) {
   }
 
   return channelMap;
+}
+
+export function buildDiscordForumImportRules(metabase) {
+  const rules = [];
+  for (const endpoint of metabase.adapterEndpoints ?? []) {
+    if (endpoint.system !== 'discord') {
+      continue;
+    }
+
+    rules.push(...(endpoint.forumThreadImportRules ?? []));
+  }
+
+  return rules;
+}
+
+export function resolveDiscordForumImportTarget(rules, sourceChannel, firstMessage) {
+  const title = sourceChannel?.name ?? '';
+  const body = firstMessage?.content ?? '';
+
+  for (const rule of rules) {
+    if (rule.default) {
+      return rule;
+    }
+
+    const titlePatterns = normalizePatternList(rule.match?.titleIncludes ?? rule.titleIncludes);
+    const bodyPatterns = normalizePatternList(rule.match?.bodyIncludes ?? rule.bodyIncludes);
+    const expectedTypes = normalizePatternList(rule.match?.channelTypes ?? rule.channelTypes);
+
+    if (expectedTypes.length > 0 && !expectedTypes.includes(normalizeIdentityValue(sourceChannel?.channel_type))) {
+      continue;
+    }
+
+    const titleMatched = textMatchesPatterns(title, titlePatterns);
+    const bodyMatched = textMatchesPatterns(body, bodyPatterns);
+    const hasTextPatterns = titlePatterns.length > 0 || bodyPatterns.length > 0;
+
+    if (!hasTextPatterns && expectedTypes.length > 0) {
+      return rule;
+    }
+
+    if ((titlePatterns.length > 0 && titleMatched) || (bodyPatterns.length > 0 && bodyMatched)) {
+      return rule;
+    }
+  }
+
+  return null;
 }
 
 export function matchDiscordAuthorToIdentity(identities, author) {
@@ -64,6 +130,14 @@ export function buildImportedIdentity(author) {
   };
 }
 
+function buildImportedPostId(channelId) {
+  return `post-discord-${channelId}`;
+}
+
+function buildImportedThreadId(channelId) {
+  return `thread-discord-${channelId}`;
+}
+
 function buildImportedMessageId(messageId) {
   return `message-discord-${messageId}`;
 }
@@ -76,10 +150,39 @@ function buildImportedEventId(messageId) {
   return `event-discord-import-${messageId}`;
 }
 
-async function loadSourceMessages({ connectionString, sourceSchema, channelIds }) {
+async function loadSourceState({ connectionString, sourceSchema, directChannelIds }) {
   const client = new Client({ connectionString });
   try {
     await client.connect();
+
+    const channels = await client.query(
+      `
+        SELECT
+          c.channel_id,
+          c.guild_id,
+          c.name,
+          c.channel_type,
+          c.topic,
+          c.raw_json,
+          c.first_seen_at,
+          c.last_seen_at
+        FROM ${sourceSchema}.discord_channels c
+        WHERE c.channel_id = ANY($1::text[])
+           OR c.channel_type IN ('11', '12', '15')
+        ORDER BY COALESCE(c.first_seen_at, c.last_seen_at) ASC NULLS LAST, c.channel_id ASC;
+      `,
+      [directChannelIds]
+    );
+
+    const sourceChannelIds = channels.rows.map((row) => row.channel_id);
+    if (sourceChannelIds.length === 0) {
+      return {
+        channels: [],
+        messages: [],
+        attachments: []
+      };
+    }
+
     const messages = await client.query(
       `
         SELECT
@@ -92,11 +195,14 @@ async function loadSourceMessages({ connectionString, sourceSchema, channelIds }
           m.deleted_at,
           m.raw_json AS message_raw_json,
           c.name AS channel_name,
+          c.channel_type,
           c.topic AS channel_topic,
+          c.first_seen_at AS channel_first_seen_at,
+          c.last_seen_at AS channel_last_seen_at,
+          c.raw_json AS channel_raw_json,
           a.username,
           a.global_name,
-          a.is_bot,
-          a.raw_json AS author_raw_json
+          a.is_bot
         FROM ${sourceSchema}.discord_messages m
         JOIN ${sourceSchema}.discord_channels c
           ON c.channel_id = m.channel_id
@@ -105,7 +211,7 @@ async function loadSourceMessages({ connectionString, sourceSchema, channelIds }
         WHERE m.channel_id = ANY($1::text[])
         ORDER BY m.created_at ASC, m.message_id ASC;
       `,
-      [channelIds]
+      [sourceChannelIds]
     );
 
     const attachments = await client.query(
@@ -124,10 +230,11 @@ async function loadSourceMessages({ connectionString, sourceSchema, channelIds }
         WHERE dm.channel_id = ANY($1::text[])
         ORDER BY dma.message_id ASC, dma.attachment_id ASC;
       `,
-      [channelIds]
+      [sourceChannelIds]
     );
 
     return {
+      channels: channels.rows,
       messages: messages.rows,
       attachments: attachments.rows
     };
@@ -135,6 +242,15 @@ async function loadSourceMessages({ connectionString, sourceSchema, channelIds }
   finally {
     await client.end().catch(() => {});
   }
+}
+
+function buildAuthorIdentityId(authorIdentityMap, row) {
+  return authorIdentityMap.get(row.author_id ?? 'unknown') ?? buildImportedIdentity({
+    authorId: row.author_id,
+    username: row.username,
+    globalName: row.global_name,
+    isBot: row.is_bot
+  }).id;
 }
 
 export async function importChatbaseIntoNexus(options = {}) {
@@ -159,11 +275,20 @@ export async function importChatbaseIntoNexus(options = {}) {
   await store.init();
   try {
     const channelMap = buildDiscordChannelMap(store.metabase);
-    const source = await loadSourceMessages({
+    const forumImportRules = buildDiscordForumImportRules(store.metabase);
+    const source = await loadSourceState({
       connectionString: sourceConnectionString,
       sourceSchema,
-      channelIds: [...channelMap.keys()]
+      directChannelIds: [...channelMap.keys()]
     });
+
+    const sourceChannelsById = new Map(source.channels.map((channel) => [channel.channel_id, channel]));
+    const firstMessageByChannelId = new Map();
+    for (const row of source.messages) {
+      if (!firstMessageByChannelId.has(row.channel_id)) {
+        firstMessageByChannelId.set(row.channel_id, row);
+      }
+    }
 
     const attachmentsByMessage = new Map();
     for (const attachment of source.attachments) {
@@ -172,7 +297,9 @@ export async function importChatbaseIntoNexus(options = {}) {
       attachmentsByMessage.set(attachment.message_id, list);
     }
 
-    const importedIds = new Set(store.chatbase.messages.map((message) => message.id));
+    const importedMessageIds = new Set(store.chatbase.messages.map((message) => message.id));
+    const importedPostIds = new Set(store.chatbase.posts.map((post) => post.id));
+    const importedThreadIds = new Set(store.chatbase.threads.map((thread) => thread.id));
     const identityIds = new Set(store.metabase.identities.map((identity) => identity.id));
     const newIdentities = [];
     const authorIdentityMap = new Map();
@@ -208,29 +335,137 @@ export async function importChatbaseIntoNexus(options = {}) {
       await store.saveMetabase();
     }
 
+    const scopeCache = new Map();
+    let importedPosts = 0;
+    let importedThreads = 0;
     let importedMessages = 0;
     let importedAttachments = 0;
     let importedEvents = 0;
 
+    function ensureForumPost(sourceChannelId) {
+      const cached = scopeCache.get(sourceChannelId);
+      if (cached) {
+        return cached;
+      }
+
+      const sourceChannel = sourceChannelsById.get(sourceChannelId);
+      if (!sourceChannel) {
+        return null;
+      }
+
+      if (channelMap.has(sourceChannelId)) {
+        const directScope = {
+          scopeType: 'channel',
+          scopeId: channelMap.get(sourceChannelId),
+          targetChannelId: channelMap.get(sourceChannelId),
+          importRuleId: null,
+          externalScopeChannelId: sourceChannelId
+        };
+        scopeCache.set(sourceChannelId, directScope);
+        return directScope;
+      }
+
+      if (!discordThreadChannelTypes.has(String(sourceChannel.channel_type))) {
+        return null;
+      }
+
+      const firstMessage = firstMessageByChannelId.get(sourceChannelId);
+      const importRule = resolveDiscordForumImportTarget(forumImportRules, sourceChannel, firstMessage);
+      if (!importRule?.channelId) {
+        return null;
+      }
+
+      if (String(sourceChannel.channel_type) === '11') {
+        const postId = buildImportedPostId(sourceChannelId);
+        if (!importedPostIds.has(postId)) {
+          const createdByIdentityId = firstMessage
+            ? buildAuthorIdentityId(authorIdentityMap, firstMessage)
+            : 'identity-jack';
+          store.chatbase.posts.push({
+            id: postId,
+            channelId: importRule.channelId,
+            title: sourceChannel.name ?? `Imported Discord post ${sourceChannelId}`,
+            createdAt: new Date(firstMessage?.created_at ?? sourceChannel.first_seen_at ?? sourceChannel.last_seen_at ?? Date.now()).toISOString(),
+            createdByIdentityId,
+            source: {
+              system: 'discord',
+              externalChannelId: sourceChannelId,
+              externalChannelType: sourceChannel.channel_type,
+              importedBy: 'nexus-chatbase-import',
+              importRuleId: importRule.id ?? null
+            },
+            raw: sourceChannel.raw_json ?? {}
+          });
+          importedPostIds.add(postId);
+          importedPosts += 1;
+        }
+
+        const scope = {
+          scopeType: 'post',
+          scopeId: postId,
+          targetChannelId: importRule.channelId,
+          importRuleId: importRule.id ?? null,
+          externalScopeChannelId: sourceChannelId
+        };
+        scopeCache.set(sourceChannelId, scope);
+        return scope;
+      }
+
+      const threadId = buildImportedThreadId(sourceChannelId);
+      if (!importedThreadIds.has(threadId)) {
+        const createdByIdentityId = firstMessage
+          ? buildAuthorIdentityId(authorIdentityMap, firstMessage)
+          : 'identity-jack';
+        store.chatbase.threads.push({
+          id: threadId,
+          channelId: importRule.channelId,
+          postId: null,
+          title: sourceChannel.name ?? `Imported Discord thread ${sourceChannelId}`,
+          createdAt: new Date(firstMessage?.created_at ?? sourceChannel.first_seen_at ?? sourceChannel.last_seen_at ?? Date.now()).toISOString(),
+          createdByIdentityId,
+          source: {
+            system: 'discord',
+            externalChannelId: sourceChannelId,
+            externalChannelType: sourceChannel.channel_type,
+            importedBy: 'nexus-chatbase-import',
+            importRuleId: importRule.id ?? null
+          },
+          raw: sourceChannel.raw_json ?? {}
+        });
+        importedThreadIds.add(threadId);
+        importedThreads += 1;
+      }
+
+      const scope = {
+        scopeType: 'thread',
+        scopeId: threadId,
+        targetChannelId: importRule.channelId,
+        importRuleId: importRule.id ?? null,
+        externalScopeChannelId: sourceChannelId
+      };
+      scopeCache.set(sourceChannelId, scope);
+      return scope;
+    }
+
     for (const row of source.messages) {
       const importedMessageId = buildImportedMessageId(row.message_id);
-      if (importedIds.has(importedMessageId)) {
+      if (importedMessageIds.has(importedMessageId)) {
+        continue;
+      }
+
+      const scope = ensureForumPost(row.channel_id);
+      if (!scope) {
         continue;
       }
 
       const attachmentRows = attachmentsByMessage.get(row.message_id) ?? [];
       const attachmentIds = attachmentRows.map((attachment) => buildImportedAttachmentId(attachment.attachment_id));
-      const authorIdentityId = authorIdentityMap.get(row.author_id ?? 'unknown') ?? buildImportedIdentity({
-        authorId: row.author_id,
-        username: row.username,
-        globalName: row.global_name,
-        isBot: row.is_bot
-      }).id;
+      const authorIdentityId = buildAuthorIdentityId(authorIdentityMap, row);
 
       store.chatbase.messages.push({
         id: importedMessageId,
-        scopeType: 'channel',
-        scopeId: channelMap.get(row.channel_id),
+        scopeType: scope.scopeType,
+        scopeId: scope.scopeId,
         authorIdentityId,
         body: row.content ?? '',
         createdAt: new Date(row.created_at).toISOString(),
@@ -241,14 +476,16 @@ export async function importChatbaseIntoNexus(options = {}) {
           externalAuthorId: row.author_id ?? null,
           channelName: row.channel_name,
           channelTopic: row.channel_topic ?? null,
-          importedBy: 'nexus-chatbase-import'
+          routedChannelId: scope.targetChannelId,
+          importedBy: 'nexus-chatbase-import',
+          importRuleId: scope.importRuleId
         },
         attachmentIds,
         editedAt: row.edited_at ? new Date(row.edited_at).toISOString() : null,
         deletedAt: row.deleted_at ? new Date(row.deleted_at).toISOString() : null,
         raw: row.message_raw_json ?? {}
       });
-      importedIds.add(importedMessageId);
+      importedMessageIds.add(importedMessageId);
       importedMessages += 1;
 
       for (const attachment of attachmentRows) {
@@ -277,20 +514,24 @@ export async function importChatbaseIntoNexus(options = {}) {
           system: 'discord',
           externalChannelId: row.channel_id,
           externalMessageId: row.message_id,
-          importedBy: 'nexus-chatbase-import'
+          routedChannelId: scope.targetChannelId,
+          importedBy: 'nexus-chatbase-import',
+          importRuleId: scope.importRuleId
         },
         raw: {
           externalChannelId: row.channel_id,
           externalMessageId: row.message_id,
           originalCreatedAt: row.created_at,
           originalEditedAt: row.edited_at,
-          originalDeletedAt: row.deleted_at
+          originalDeletedAt: row.deleted_at,
+          scopeType: scope.scopeType,
+          scopeId: scope.scopeId
         }
       });
       importedEvents += 1;
     }
 
-    if (importedMessages > 0 || importedAttachments > 0 || importedEvents > 0) {
+    if (importedPosts > 0 || importedThreads > 0 || importedMessages > 0 || importedAttachments > 0 || importedEvents > 0) {
       await store.saveChatbase();
     }
 
@@ -301,9 +542,13 @@ export async function importChatbaseIntoNexus(options = {}) {
         chatbase: config.libraryChatbaseSchema
       },
       mappedChannels: channelMap.size,
+      forumImportRules: forumImportRules.length,
+      sourceChannels: source.channels.length,
       sourceMessages: source.messages.length,
       sourceAttachments: source.attachments.length,
       importedIdentities: newIdentities.length,
+      importedPosts,
+      importedThreads,
       importedMessages,
       importedAttachments,
       importedEvents

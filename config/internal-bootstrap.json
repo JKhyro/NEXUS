@@ -38,8 +38,9 @@
       "name": "Workflow",
       "kind": "shared",
       "description": "Teamwork coordination and active planning.",
-      "topic": "Purpose: teamwork coordination, active planning, execution sequencing, blockers, handoffs, and practical collaboration across the main Symbiotes. Use this for work that helps the team move. Reply constructively and avoid casual chatter, sensitive governance, database-only matters, or redundant answers. If a better lane fits, redirect there.",
-      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] }
+      "topic": "Purpose: teamwork coordination, active planning, execution sequencing, blockers, handoffs, and practical collaboration across the main Symbiotes. Use this for work that helps the team move. Reply constructively and avoid casual chatter, sensitive governance, digest publication, database-only matters, or redundant answers. If a better lane fits, redirect there.",
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] },
+      "writeAccess": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] }
     },
     {
       "id": "channel-requests",
@@ -49,7 +50,8 @@
       "kind": "shared",
       "description": "Formal asks, support requests, and planned work requests.",
       "topic": "Purpose: project and systems requests, formal asks, action requests, review requests, support requests, and statusable work requests. Use this when someone needs action, planning, review, access, prioritization, or support on ongoing work. Include enough context to act. Avoid bug-triage noise and route runtime failures to report.",
-      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] }
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-service"], "allowedIdentityIds": [] },
+      "writeAccess": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] }
     },
     {
       "id": "channel-report",
@@ -58,8 +60,20 @@
       "name": "Report",
       "kind": "forum",
       "description": "System issue reporting and incident posts.",
-      "topic": "Purpose: problem reporting for systems in use. Use this forum for bugs, failures, breakages, incidents, unexpected behavior, diagnostics, reproduction steps, severity, impact, and mitigation. One issue per post. Include what happened, where, when, impact, and how to reproduce if known. Avoid turning this into a generic request lane.",
-      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-service"], "allowedIdentityIds": [] }
+      "topic": "Purpose: problem reporting for systems in use. Use this forum for bugs, failures, breakages, incidents, unexpected behavior, diagnostics, reproduction steps, severity, impact, and mitigation. Create or use a post for each issue so reporting and follow-up stay organized. Include what happened, where, when, impact, and how to reproduce if known. Avoid turning this into a generic request lane.",
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-collector", "role-service"], "allowedIdentityIds": [] },
+      "writeAccess": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] }
+    },
+    {
+      "id": "channel-investigation",
+      "workspaceId": "workspace-internal-core",
+      "slug": "investigation",
+      "name": "Investigation",
+      "kind": "forum",
+      "description": "Evidence-based investigation reports, reviews, and follow-up posts.",
+      "topic": "Purpose: evidence-based investigation reports. Use this for linked reports about suspicious, destructive, anti-enterprise, or otherwise problematic messages, behaviors, or missed required digests. Paladin should post concise evidence-based reports here without moralizing. Hera leads review and response with Jack. Link the source message, post, thread, channel, or identity being reported whenever possible.",
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-collector", "role-service"], "allowedIdentityIds": [] },
+      "writeAccess": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-hera", "identity-paladin"] }
     },
     {
       "id": "channel-general",
@@ -68,8 +82,9 @@
       "name": "General",
       "kind": "shared",
       "description": "Low-sensitivity general discussion.",
-      "topic": "Purpose: low-sensitivity general conversation. Use this for casual discussion, light check-ins, and non-sensitive thoughts that do not belong in workflow, requests, report, council, or library. Keep it safe and unspecialized. Avoid urgent work coordination, sensitive matters, or database-governance discussion.",
-      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-service"], "allowedIdentityIds": [] }
+      "topic": "Purpose: low-sensitivity general conversation. Use this for casual discussion, light check-ins, and non-sensitive thoughts that do not belong in workflow, requests, report, council, library, or digest lanes. Keep it safe and unspecialized. Avoid urgent work coordination, sensitive matters, bug triage, or database-governance discussion.",
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-service"], "allowedIdentityIds": [] },
+      "writeAccess": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] }
     },
     {
       "id": "channel-council",
@@ -78,8 +93,9 @@
       "name": "Council",
       "kind": "shared",
       "description": "Sensitive governance and critical coordination discussion.",
-      "topic": "Purpose: sensitive or critical discussion for the main seven Symbiotes with Jack. Use this for high-stakes judgment, governance, conflict, risk, and delicate coordination that should not be discussed elsewhere. Be deliberate, concise, and constructive. Avoid casual chatter and routine operational noise.",
-      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] }
+      "topic": "Purpose: sensitive or critical discussion for the main seven Symbiotes with Jack. Use this for high-stakes judgment, governance, conflict, risk, and delicate coordination that should not be discussed elsewhere. Be deliberate, concise, and constructive. Avoid casual chatter, digest publication, and routine operational noise.",
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] },
+      "writeAccess": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote"], "allowedIdentityIds": [] }
     },
     {
       "id": "channel-library",
@@ -89,7 +105,41 @@
       "kind": "shared",
       "description": "LIBRARY estate discussion, curation, and policy.",
       "topic": "Purpose: discussion about the whole LIBRARY database estate. Use this for CHATBASE, METABASE, any other LIBRARY subdatabase, curation, retrieval, schema, placement, policy, auditability, governance, and Curator discussion with Jack or the main Symbiotes. Avoid casual chat and route general execution work to workflow, requests, or report as appropriate.",
-      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-service"], "allowedIdentityIds": [] }
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-service"], "allowedIdentityIds": [] },
+      "writeAccess": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator"], "allowedIdentityIds": [] }
+    },
+    {
+      "id": "channel-digest-micro",
+      "workspaceId": "workspace-internal-core",
+      "slug": "digest-micro",
+      "name": "Digest Micro",
+      "kind": "shared",
+      "description": "Short, high-signal digest notes and micro-updates.",
+      "topic": "Purpose: micro-digest publication and high-signal digest fragments. Use this only for actual micro-digest entries or digest-ready note fragments intended to remain as digest artifacts. Keep entries compact, factual, and publication-ready. Do not post coordination, reminders, enforcement notices, or source-material requests here; move those to workflow, council, investigation, or a specialist lane.",
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-collector", "role-service"], "allowedIdentityIds": [] },
+      "writeAccess": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-service"], "allowedIdentityIds": [] }
+    },
+    {
+      "id": "channel-digest-agent",
+      "workspaceId": "workspace-internal-core",
+      "slug": "digest-agent",
+      "name": "Digest Agent",
+      "kind": "shared",
+      "description": "Agent Digest publication and catch-up digest output.",
+      "topic": "Purpose: Agent Digest publication and catch-up digest output. Use this only for actual Agent Digest posts, catch-up digest entries, or digest-ready publication text. Do not post coordination chatter, missing-digest reminders, enforcement notices, or requests for source material here; move those to workflow, council, investigation, or a specialist lane.",
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-collector", "role-service"], "allowedIdentityIds": [] },
+      "writeAccess": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-service"], "allowedIdentityIds": [] }
+    },
+    {
+      "id": "channel-digest-daily",
+      "workspaceId": "workspace-internal-core",
+      "slug": "digest-daily",
+      "name": "Digest Daily",
+      "kind": "shared",
+      "description": "Final daily and Prime Digest publication lane.",
+      "topic": "Purpose: Daily or Prime Digest publication and final digest output. Use this only for actual digest publication text, final digest review language, or digest-ready final output. Do not post reminders, enforcement notices, or coordination chatter here; move those to workflow, council, investigation, or a specialist lane. Hera owns Prime Digest publication after considering Primary collaboration.",
+      "access": { "mode": "workspace", "allowedRoleIds": ["role-operator", "role-symbiote", "role-curator", "role-collector", "role-service"], "allowedIdentityIds": [] },
+      "writeAccess": { "mode": "restricted", "allowedRoleIds": [], "allowedIdentityIds": ["identity-jack", "identity-kira", "identity-hera", "identity-librarian", "identity-arbitrian", "identity-custodian"] }
     },
     {
       "id": "channel-kira",
@@ -218,9 +268,13 @@
         { "externalChannelId": "1481091195013955664", "channelId": "channel-workflow" },
         { "externalChannelId": "1481093718919483616", "channelId": "channel-requests" },
         { "externalChannelId": "1481840691066700038", "channelId": "channel-report" },
+        { "externalChannelId": "1481883341161631844", "channelId": "channel-investigation" },
         { "externalChannelId": "1476080822124675135", "channelId": "channel-general" },
         { "externalChannelId": "1480925690688700590", "channelId": "channel-council" },
         { "externalChannelId": "1480925572153606234", "channelId": "channel-library" },
+        { "externalChannelId": "1481530791275135078", "channelId": "channel-digest-micro" },
+        { "externalChannelId": "1481517000290340985", "channelId": "channel-digest-agent" },
+        { "externalChannelId": "1481518513893015652", "channelId": "channel-digest-daily" },
         { "externalChannelId": "1480382282320580708", "channelId": "channel-kira" },
         { "externalChannelId": "1480382365158346762", "channelId": "channel-hera" },
         { "externalChannelId": "1480382410209362040", "channelId": "channel-yura" },
@@ -228,6 +282,29 @@
         { "externalChannelId": "1480382452592672798", "channelId": "channel-sara" },
         { "externalChannelId": "1480382523468025866", "channelId": "channel-tyra" },
         { "externalChannelId": "1480382676694339646", "channelId": "channel-nora" }
+      ],
+      "forumThreadImportRules": [
+        {
+          "id": "discord-forum-investigation",
+          "channelId": "channel-investigation",
+          "match": {
+            "titleIncludes": ["[digest]", "review request", "system issue", "bridge handler error", "reviewer instructions"],
+            "bodyIncludes": ["review this report", "paladin has reported", "missing required digest", "bridge handler error", "investigation digest"]
+          }
+        },
+        {
+          "id": "discord-forum-report",
+          "channelId": "channel-report",
+          "match": {
+            "titleIncludes": ["bug", "failure", "incident", "outage", "unexpected", "repro", "runtime"],
+            "bodyIncludes": ["reproduce", "unexpected behavior", "runtime failure", "incident", "outage", "bug report"]
+          }
+        },
+        {
+          "id": "discord-forum-library-default",
+          "channelId": "channel-library",
+          "default": true
+        }
       ]
     }
   ]

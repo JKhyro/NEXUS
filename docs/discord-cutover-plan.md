@@ -22,9 +22,13 @@ The first bootstrap should include:
 - shared workflow lane
 - shared requests lane
 - shared report/forum lane
+- shared investigation/forum lane
 - shared library lane
 - shared council/governance lane
 - shared general lane
+- shared digest-micro lane
+- shared digest-agent lane
+- shared digest-daily lane
 - private Kira lane
 - private specialist lanes for Hera, Yura, Aura, Sara, Tyra, and Nora
 - private curator lanes for Librarian, Arbitrian, and Custodian
@@ -50,6 +54,8 @@ The first bounded migration path now exists.
 
 - `npm run import:chatbase` reads retained Discord history from LIBRARY's existing `chatbase` schema
 - it imports only adapter-mapped Discord lanes into NEXUS-native records
+- it imports retained Discord forum-thread channels as native NEXUS posts instead of flattening them into ordinary channel messages
+- it uses explicit bootstrap forum-routing rules when the retained Discord source does not preserve parent forum ids
 - it preserves NEXUS access policy by mapping imported messages into the already-defined NEXUS channels instead of inheriting Discord permissions directly
 - it prefers existing NEXUS identities for known Discord authors and only falls back to synthetic Discord identities when no internal match exists
 

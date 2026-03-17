@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 
 import {
   buildDiscordChannelMap,
+  buildDiscordForumImportRules,
   buildImportedIdentity,
-  matchDiscordAuthorToIdentity
+  matchDiscordAuthorToIdentity,
+  resolveDiscordForumImportTarget
 } from '../apps/service/src/lib/chatbase-import.mjs';
 import { syncBootstrapMetabase } from '../apps/service/src/lib/bootstrap-sync.mjs';
 
@@ -30,6 +32,69 @@ test('buildDiscordChannelMap flattens Discord adapter mappings', () => {
   assert.equal(channelMap.get('1481091195013955664'), 'channel-workflow');
   assert.equal(channelMap.get('1481093718919483616'), 'channel-requests');
   assert.equal(channelMap.has('ignored'), false);
+});
+
+test('buildDiscordForumImportRules collects Discord forum routing rules', () => {
+  const rules = buildDiscordForumImportRules({
+    adapterEndpoints: [
+      {
+        system: 'discord',
+        forumThreadImportRules: [
+          { id: 'rule-one', channelId: 'channel-investigation' },
+          { id: 'rule-two', channelId: 'channel-library', default: true }
+        ]
+      },
+      {
+        system: 'github',
+        forumThreadImportRules: [{ id: 'ignored', channelId: 'channel-ignored' }]
+      }
+    ]
+  });
+
+  assert.equal(rules.length, 2);
+  assert.equal(rules[0].id, 'rule-one');
+  assert.equal(rules[1].channelId, 'channel-library');
+});
+
+test('resolveDiscordForumImportTarget routes retained Discord forum threads deterministically', () => {
+  const rules = [
+    {
+      id: 'discord-forum-investigation',
+      channelId: 'channel-investigation',
+      match: {
+        titleIncludes: ['review request', '[digest]'],
+        bodyIncludes: ['review this report', 'missing required digest']
+      }
+    },
+    {
+      id: 'discord-forum-library-default',
+      channelId: 'channel-library',
+      default: true
+    }
+  ];
+
+  const investigationRule = resolveDiscordForumImportTarget(rules, {
+    channel_type: '11',
+    name: 'Review request'
+  }, {
+    content: 'Review this report and tell me the immediate concern.'
+  });
+  const titleOnlyRule = resolveDiscordForumImportTarget(rules, {
+    channel_type: '11',
+    name: '[DIGEST] Hera missing required Agent Digest'
+  }, {
+    content: 'Procedural follow-up only.'
+  });
+  const fallbackRule = resolveDiscordForumImportTarget(rules, {
+    channel_type: '11',
+    name: 'Hello'
+  }, {
+    content: 'Just checking the lane.'
+  });
+
+  assert.equal(investigationRule?.channelId, 'channel-investigation');
+  assert.equal(titleOnlyRule?.channelId, 'channel-investigation');
+  assert.equal(fallbackRule?.channelId, 'channel-library');
 });
 
 test('matchDiscordAuthorToIdentity maps known Discord authors to existing NEXUS identities', () => {

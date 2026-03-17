@@ -68,6 +68,8 @@ For normal local use, copy [config/nexus.local.example.json](config/nexus.local.
 
 `npm run import:chatbase` imports retained Discord history from the existing LIBRARY `chatbase` schema into NEXUS-native records using the active Discord adapter channel mappings. The first importer pass is intentionally bounded to adapter-mapped channels, so it brings over known lanes without redefining NEXUS access policy.
 
+The importer now also carries retained Discord forum posts into native NEXUS posts when the retained source only preserves thread-channel rows. Those forum posts are routed through explicit bootstrap rules so investigation-style posts land in `investigation`, issue-style posts land in `report`, and unmatched retained forum posts fall back to `library` instead of being dropped.
+
 ## Architecture records
 
 - [First-pass architecture brief](docs/first-pass-architecture.md)

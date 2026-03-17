@@ -17,14 +17,22 @@ function getRoleSet(metabase, memberships) {
   return roleIds;
 }
 
-export function canReadChannel(metabase, actorId, channel) {
+function resolveChannelPolicy(channel, mode) {
+  const defaultPolicy = { mode: 'workspace', allowedRoleIds: [], allowedIdentityIds: [] };
+  if (mode === 'write') {
+    return channel.writeAccess ?? channel.access ?? defaultPolicy;
+  }
+  return channel.access ?? defaultPolicy;
+}
+
+function canAccessChannel(metabase, actorId, channel, mode) {
   const memberships = getWorkspaceMemberships(metabase, actorId, channel.workspaceId);
   if (memberships.length === 0) {
     return false;
   }
 
   const roleIds = getRoleSet(metabase, memberships);
-  const access = channel.access ?? { mode: 'workspace', allowedRoleIds: [], allowedIdentityIds: [] };
+  const access = resolveChannelPolicy(channel, mode);
   if (access.mode === 'workspace') {
     if (!access.allowedRoleIds || access.allowedRoleIds.length === 0) {
       return true;
@@ -41,6 +49,14 @@ export function canReadChannel(metabase, actorId, channel) {
   }
 
   return false;
+}
+
+export function canReadChannel(metabase, actorId, channel) {
+  return canAccessChannel(metabase, actorId, channel, 'read');
+}
+
+export function canWriteChannel(metabase, actorId, channel) {
+  return canAccessChannel(metabase, actorId, channel, 'write');
 }
 
 export function canReadDirectConversation(metabase, actorId, directConversation) {
@@ -90,5 +106,16 @@ export function assertReadableScope(store, actorId, scopeType, scopeId) {
 }
 
 export function assertWritableScope(store, actorId, scopeType, scopeId) {
-  assertReadableScope(store, actorId, scopeType, scopeId);
+  if (scopeType === 'direct') {
+    const directConversation = store.metabase.directConversations.find((entry) => entry.id === scopeId);
+    if (!directConversation || !canReadDirectConversation(store.metabase, actorId, directConversation)) {
+      throw new Error('Actor is not allowed to write this direct conversation.');
+    }
+    return;
+  }
+
+  const channel = resolveScopeChannel(store, scopeType, scopeId);
+  if (!channel || !canWriteChannel(store.metabase, actorId, channel)) {
+    throw new Error('Actor is not allowed to write this scope.');
+  }
 }

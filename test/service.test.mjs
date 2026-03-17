@@ -32,6 +32,8 @@ test('service boots and exposes the seeded internal channel map', async () => {
     const slugs = new Set(channels.map((channel) => channel.slug));
     assert(slugs.has('workflow'));
     assert(slugs.has('report'));
+    assert(slugs.has('investigation'));
+    assert(slugs.has('digest-agent'));
     assert(slugs.has('hera'));
     assert(slugs.has('librarian'));
   });
@@ -71,6 +73,27 @@ test('private channel reads are blocked by access policy', async () => {
     const body = await response.json();
     assert.equal(response.status, 500);
     assert.match(body.error, /not allowed/i);
+  });
+});
+
+test('channel write policy can be narrower than channel read policy', async () => {
+  await withService(async (service) => {
+    const readable = await fetch(`${service.url}/api/messages?actorId=identity-librarian&scopeType=channel&scopeId=channel-investigation`);
+    assert.equal(readable.status, 200);
+
+    const writeAttempt = await fetch(`${service.url}/api/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-librarian',
+        scopeType: 'channel',
+        scopeId: 'channel-investigation',
+        body: 'Curator note in a read-only lane'
+      })
+    });
+    const body = await writeAttempt.json();
+    assert.equal(writeAttempt.status, 500);
+    assert.match(body.error, /write/i);
   });
 });
 
