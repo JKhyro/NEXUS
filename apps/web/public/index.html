@@ -73,6 +73,16 @@
               <form id="post-composer" class="composer post-composer">
                 <input id="post-title" type="text" placeholder="Post title">
                 <textarea id="post-body" rows="5" placeholder="Write the opening message for a new post"></textarea>
+                <div class="attachment-shell">
+                  <div class="attachment-shell-top">
+                    <div>
+                      <div class="eyebrow">Attachments</div>
+                      <h4>Opening message attachments</h4>
+                    </div>
+                    <button id="post-add-attachment" type="button" class="ghost-button">Add Attachment</button>
+                  </div>
+                  <div id="post-attachment-list" class="attachment-draft-list"></div>
+                </div>
                 <button type="submit">Create Post</button>
               </form>
             </aside>
@@ -97,6 +107,16 @@
               <div id="messages" class="messages"></div>
               <form id="composer" class="composer">
                 <textarea id="message-body" rows="4" placeholder="Write a message into the selected scope"></textarea>
+                <div class="attachment-shell">
+                  <div class="attachment-shell-top">
+                    <div>
+                      <div class="eyebrow">Attachments</div>
+                      <h4>Message attachments</h4>
+                    </div>
+                    <button id="message-add-attachment" type="button" class="ghost-button">Add Attachment</button>
+                  </div>
+                  <div id="message-attachment-list" class="attachment-draft-list"></div>
+                </div>
                 <div class="composer-footer">
                   <div id="composer-hint" class="muted">Select a writable scope to send a message.</div>
                   <button id="send-button" type="submit">Send</button>

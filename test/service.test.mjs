@@ -152,6 +152,39 @@ test('ANVIL references can attach to readable messages', async () => {
   });
 });
 
+test('messages expose inline attachments through read and search flows', async () => {
+  await withService(async (service) => {
+    const created = await fetch(`${service.url}/api/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        scopeType: 'channel',
+        scopeId: 'channel-requests',
+        body: 'Attachment-bearing message',
+        attachments: [
+          {
+            name: 'trace.txt',
+            mediaType: 'text/plain',
+            url: 'https://example.invalid/trace.txt',
+            bytes: 512
+          }
+        ]
+      })
+    }).then((response) => response.json());
+
+    const messages = await fetch(`${service.url}/api/messages?actorId=identity-jack&scopeType=channel&scopeId=channel-requests`).then((response) => response.json());
+    const searchResults = await fetch(`${service.url}/api/search?actorId=identity-jack&q=${encodeURIComponent('Attachment-bearing message')}`).then((response) => response.json());
+
+    const message = messages.find((entry) => entry.id === created.message.id);
+    const match = searchResults.find((entry) => entry.id === created.message.id);
+    assert.equal(message.attachments.length, 1);
+    assert.equal(message.attachments[0].name, 'trace.txt');
+    assert.equal(match.attachments.length, 1);
+    assert.equal(match.attachments[0].url, 'https://example.invalid/trace.txt');
+  });
+});
+
 test('forum posts can be created and read through the shared service contract', async () => {
   await withService(async (service) => {
     const created = await fetch(`${service.url}/api/posts`, {
@@ -161,7 +194,15 @@ test('forum posts can be created and read through the shared service contract', 
         actorId: 'identity-jack',
         channelId: 'channel-report',
         title: 'Import fidelity check',
-        body: 'This is the opening message for a report post.'
+        body: 'This is the opening message for a report post.',
+        attachments: [
+          {
+            name: 'report-screenshot.png',
+            mediaType: 'image/png',
+            url: 'https://example.invalid/report-screenshot.png',
+            bytes: 2048
+          }
+        ]
       })
     }).then((response) => response.json());
 
@@ -169,7 +210,10 @@ test('forum posts can be created and read through the shared service contract', 
     const messages = await fetch(`${service.url}/api/messages?actorId=identity-jack&scopeType=post&scopeId=${created.post.id}`).then((response) => response.json());
 
     assert(posts.some((post) => post.id === created.post.id && post.title === 'Import fidelity check'));
-    assert(messages.some((message) => message.body === 'This is the opening message for a report post.'));
+    const openingMessage = messages.find((message) => message.body === 'This is the opening message for a report post.');
+    assert(openingMessage);
+    assert.equal(openingMessage.attachments.length, 1);
+    assert.equal(openingMessage.attachments[0].name, 'report-screenshot.png');
   });
 });
 

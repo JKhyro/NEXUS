@@ -94,11 +94,24 @@ export class BaseNexusStore {
     });
   }
 
+  hydrateMessageAttachments(messages) {
+    return messages.map((message) => {
+      const attachments = this.chatbase.attachments.filter((attachment) => {
+        return attachment.messageId === message.id || (message.attachmentIds ?? []).includes(attachment.id);
+      });
+      return {
+        ...message,
+        attachments
+      };
+    });
+  }
+
   listMessages(actorId, scopeType, scopeId) {
     assertReadableScope(this, actorId, scopeType, scopeId);
-    return this.chatbase.messages.filter((message) => {
+    const messages = this.chatbase.messages.filter((message) => {
       return message.scopeType === scopeType && message.scopeId === scopeId;
     });
+    return this.hydrateMessageAttachments(messages);
   }
 
   listExternalReferences(actorId, ownerType, ownerId) {
@@ -124,7 +137,7 @@ export class BaseNexusStore {
 
   searchMessages(actorId, query) {
     const lower = query.trim().toLowerCase();
-    return this.chatbase.messages.filter((message) => {
+    const messages = this.chatbase.messages.filter((message) => {
       if (!message.body.toLowerCase().includes(lower)) {
         return false;
       }
@@ -136,6 +149,7 @@ export class BaseNexusStore {
         return false;
       }
     });
+    return this.hydrateMessageAttachments(messages);
   }
 
   async createMessage(input) {
@@ -201,7 +215,8 @@ export class BaseNexusStore {
       actorId: input.actorId,
       scopeType: 'post',
       scopeId: post.id,
-      body: input.body
+      body: input.body,
+      attachments: input.attachments ?? []
     });
 
     await this.saveChatbase();

@@ -13,6 +13,8 @@ const postListEl = document.querySelector('#post-list');
 const postComposerEl = document.querySelector('#post-composer');
 const postTitleEl = document.querySelector('#post-title');
 const postBodyEl = document.querySelector('#post-body');
+const postAttachmentListEl = document.querySelector('#post-attachment-list');
+const postAddAttachmentEl = document.querySelector('#post-add-attachment');
 const threadColumnEl = document.querySelector('#thread-column');
 const threadParentCopyEl = document.querySelector('#thread-parent-copy');
 const threadListEl = document.querySelector('#thread-list');
@@ -22,6 +24,8 @@ const scopeContextEl = document.querySelector('#scope-context');
 const messagesEl = document.querySelector('#messages');
 const composerEl = document.querySelector('#composer');
 const bodyEl = document.querySelector('#message-body');
+const messageAttachmentListEl = document.querySelector('#message-attachment-list');
+const messageAddAttachmentEl = document.querySelector('#message-add-attachment');
 const composerHintEl = document.querySelector('#composer-hint');
 const sendButtonEl = document.querySelector('#send-button');
 const refreshEl = document.querySelector('#refresh');
@@ -196,6 +200,153 @@ function formatTimestamp(value) {
     return 'Unknown time';
   }
   return new Date(value).toLocaleString();
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes ?? 0);
+  if (!Number.isFinite(value) || value <= 0) {
+    return 'Size unknown';
+  }
+
+  if (value < 1024) {
+    return `${value} B`;
+  }
+
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function safeAttachmentHref(url) {
+  if (typeof url !== 'string' || !url.trim()) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString();
+    }
+  }
+  catch {
+    return null;
+  }
+
+  return null;
+}
+
+function attachmentMetaLine(attachment) {
+  const parts = [];
+  if (attachment.mediaType) {
+    parts.push(attachment.mediaType);
+  }
+  parts.push(formatBytes(attachment.bytes));
+  return parts.join(' | ');
+}
+
+function renderAttachmentMarkup(attachments = []) {
+  if (!attachments.length) {
+    return '';
+  }
+
+  return `
+    <div class="attachment-list">
+      ${attachments.map((attachment) => {
+        const href = safeAttachmentHref(attachment.url);
+        return `
+          <div class="attachment-card">
+            <div class="attachment-card-top">
+              <strong>${escapeHtml(attachment.name ?? 'attachment')}</strong>
+              <span class="pill attachment-pill">attachment</span>
+            </div>
+            <div class="attachment-card-meta">${escapeHtml(attachmentMetaLine(attachment))}</div>
+            ${href
+              ? `<a class="attachment-link" href="${escapeHtml(href)}" target="_blank" rel="noreferrer">Open attachment</a>`
+              : attachment.url
+                ? `<div class="attachment-link muted">${escapeHtml(attachment.url)}</div>`
+                : '<div class="attachment-link muted">No URL metadata</div>'}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderAttachmentSearchSummary(attachments = []) {
+  if (!attachments.length) {
+    return '';
+  }
+
+  const names = attachments.slice(0, 3).map((attachment) => attachment.name ?? 'attachment').join(', ');
+  const remainder = attachments.length > 3 ? ` +${attachments.length - 3} more` : '';
+  return `
+    <div class="search-card-attachments">
+      ${escapeHtml(`${attachments.length} attachment${attachments.length === 1 ? '' : 's'}: ${names}${remainder}`)}
+    </div>
+  `;
+}
+
+function syncAttachmentDraftPlaceholder(container) {
+  const hasDrafts = Boolean(container.querySelector('.attachment-draft'));
+  const placeholder = container.querySelector('.attachment-empty');
+  if (!hasDrafts && !placeholder) {
+    const empty = document.createElement('div');
+    empty.className = 'attachment-empty';
+    empty.textContent = 'No attachment metadata drafted yet.';
+    container.appendChild(empty);
+    return;
+  }
+
+  if (hasDrafts && placeholder) {
+    placeholder.remove();
+  }
+}
+
+function appendAttachmentDraft(container, draft = {}) {
+  container.querySelector('.attachment-empty')?.remove();
+
+  const row = document.createElement('div');
+  row.className = 'attachment-draft';
+  row.innerHTML = `
+    <input class="attachment-name" type="text" placeholder="Attachment name" value="${escapeHtml(draft.name ?? '')}">
+    <input class="attachment-media-type" type="text" placeholder="Media type" value="${escapeHtml(draft.mediaType ?? '')}">
+    <input class="attachment-url" type="text" placeholder="https://example.invalid/file" value="${escapeHtml(draft.url ?? '')}">
+    <input class="attachment-bytes" type="number" min="0" step="1" placeholder="Bytes" value="${draft.bytes ?? ''}">
+    <button type="button" class="attachment-remove">Remove</button>
+  `;
+  row.querySelector('.attachment-remove').addEventListener('click', () => {
+    row.remove();
+    syncAttachmentDraftPlaceholder(container);
+  });
+  container.appendChild(row);
+}
+
+function collectAttachmentDrafts(container) {
+  return Array.from(container.querySelectorAll('.attachment-draft')).map((row) => {
+    const name = row.querySelector('.attachment-name')?.value.trim() ?? '';
+    const mediaType = row.querySelector('.attachment-media-type')?.value.trim() ?? '';
+    const url = row.querySelector('.attachment-url')?.value.trim() ?? '';
+    const bytesRaw = row.querySelector('.attachment-bytes')?.value.trim() ?? '';
+    const bytes = Number.parseInt(bytesRaw, 10);
+    const hasValue = Boolean(name || mediaType || url || bytesRaw);
+    if (!hasValue) {
+      return null;
+    }
+
+    return {
+      name: name || 'attachment',
+      mediaType: mediaType || 'application/octet-stream',
+      url,
+      bytes: Number.isFinite(bytes) && bytes >= 0 ? bytes : 0
+    };
+  }).filter(Boolean);
+}
+
+function clearAttachmentDrafts(container) {
+  container.innerHTML = '';
+  syncAttachmentDraftPlaceholder(container);
 }
 
 function directConversationLabel(conversation) {
@@ -392,6 +543,7 @@ function renderMessages() {
         <span class="pill${sourcedFromDiscord ? ' discord' : ''}">${escapeHtml(sourceSystem)}</span>
       </div>
       <div class="message-body">${message.body ? escapeHtml(message.body) : '<span class="muted">Empty message body.</span>'}</div>
+      ${renderAttachmentMarkup(message.attachments)}
     `;
     messagesEl.appendChild(article);
   }
@@ -551,6 +703,7 @@ function renderSearchResults(results = []) {
         <span class="pill${sourceSystem === 'discord' ? ' discord' : ''}">${escapeHtml(sourceSystem)}</span>
       </div>
       <div class="search-card-body">${escapeHtml(match.body)}</div>
+      ${renderAttachmentSearchSummary(match.attachments)}
       <div class="search-card-meta">${escapeHtml(match.scopeType)}:${escapeHtml(match.scopeId)} | ${escapeHtml(formatTimestamp(match.createdAt))}</div>
     `;
 
@@ -885,14 +1038,17 @@ postComposerEl.addEventListener('submit', async (event) => {
   }
 
   try {
+    const attachments = collectAttachmentDrafts(postAttachmentListEl);
     const created = await postJson('/api/posts', {
       actorId: selectedActor(),
       channelId: channel.id,
       title,
-      body
+      body,
+      attachments
     });
     postTitleEl.value = '';
     postBodyEl.value = '';
+    clearAttachmentDrafts(postAttachmentListEl);
     await hydrateForumIndex();
     await hydrateThreadIndex();
     state.selectedPostId = created.post.id;
@@ -945,13 +1101,16 @@ composerEl.addEventListener('submit', async (event) => {
   }
 
   try {
+    const attachments = collectAttachmentDrafts(messageAttachmentListEl);
     await postJson('/api/messages', {
       actorId: selectedActor(),
       scopeType: state.selectedScope.scopeType,
       scopeId: state.selectedScope.scopeId,
-      body: bodyEl.value.trim()
+      body: bodyEl.value.trim(),
+      attachments
     });
     bodyEl.value = '';
+    clearAttachmentDrafts(messageAttachmentListEl);
     await syncSelection();
     setStatus(`Sent message into ${currentScopeLabel()}.`, 'success');
   }
@@ -982,12 +1141,22 @@ refreshEl.addEventListener('click', () => {
   });
 });
 
+postAddAttachmentEl.addEventListener('click', () => {
+  appendAttachmentDraft(postAttachmentListEl);
+});
+
+messageAddAttachmentEl.addEventListener('click', () => {
+  appendAttachmentDraft(messageAttachmentListEl);
+});
+
 searchEl.addEventListener('input', () => {
   runSearch().catch((error) => {
     setStatus(error.message, 'error');
   });
 });
 
+syncAttachmentDraftPlaceholder(postAttachmentListEl);
+syncAttachmentDraftPlaceholder(messageAttachmentListEl);
 await loadIdentities();
 await loadWorkspaces();
 await refreshAll();

@@ -93,7 +93,8 @@ The current desktop/web client can:
 - open forum-style channels as native post lists
 - open and create native threads under channels and posts
 - read imported Discord history from NEXUS-native channels and posts
-- create forum posts and ordinary messages through the same service contract
+- browse imported and newly created attachment metadata inline with messages
+- create forum posts and ordinary messages with inline attachment metadata through the same service contract
 - search visible history and jump into matching channel, post, thread, or direct scopes
 
 For normal local use, copy [config/nexus.local.example.json](config/nexus.local.example.json) to `config/nexus.local.json` and fill in the real LIBRARY connection details. The service and desktop shell will pick that file up automatically.

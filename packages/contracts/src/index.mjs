@@ -39,6 +39,7 @@ export function validatePostCreateInput(payload) {
   assertString(payload, 'channelId');
   assertString(payload, 'title');
   assertString(payload, 'body');
+  assertOptionalArray(payload, 'attachments');
   return payload;
 }
 

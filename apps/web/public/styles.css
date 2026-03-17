@@ -190,7 +190,12 @@ button:disabled {
 .message-card,
 .search-card,
 .channel-item,
-.post-card {
+.post-card,
+.direct-card,
+.thread-card,
+.attachment-shell,
+.attachment-draft,
+.attachment-card {
   border: 1px solid var(--line);
   border-radius: 20px;
   background: var(--panel-strong);
@@ -375,6 +380,94 @@ button:disabled {
   gap: 12px;
 }
 
+.attachment-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.attachment-shell-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.attachment-shell-top h4 {
+  font-size: 0.98rem;
+}
+
+.attachment-draft-list,
+.attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.attachment-draft,
+.attachment-card {
+  padding: 12px;
+}
+
+.attachment-draft {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.attachment-draft .attachment-url {
+  grid-column: 1 / -1;
+}
+
+.attachment-draft .attachment-bytes {
+  max-width: 180px;
+}
+
+.attachment-remove,
+.ghost-button {
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--accent-strong);
+  border: 1px solid rgba(15, 107, 90, 0.18);
+}
+
+.attachment-remove:hover:not(:disabled),
+.ghost-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.attachment-empty,
+.search-card-attachments,
+.attachment-card-meta,
+.attachment-link {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.attachment-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.attachment-link {
+  display: inline-flex;
+  margin-top: 8px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.attachment-link:hover {
+  text-decoration: underline;
+}
+
+.attachment-pill {
+  background: rgba(191, 149, 84, 0.14);
+  color: #8a5a15;
+}
+
 .compact-composer {
   margin-top: auto;
 }
@@ -453,6 +546,10 @@ pre {
   }
 
   .scope-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .attachment-draft {
     grid-template-columns: 1fr;
   }
 }
