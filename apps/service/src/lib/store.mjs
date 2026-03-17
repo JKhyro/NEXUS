@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { ensureJsonFile, readJson, writeJson } from './json-store.mjs';
 import { BaseNexusStore } from './base-store.mjs';
+import { syncBootstrapMetabase } from './bootstrap-sync.mjs';
 
 function nowIso() {
   return new Date().toISOString();
@@ -50,6 +51,12 @@ export class NexusJsonStore extends BaseNexusStore {
 
     this.metabase = await readJson(this.metabasePath);
     this.chatbase = await readJson(this.chatbasePath);
+
+    const synced = syncBootstrapMetabase(this.metabase, bootstrap, nowIso());
+    if (synced.changed) {
+      this.metabase = synced.metabase;
+      await this.saveMetabase();
+    }
   }
 
   async saveMetabase() {

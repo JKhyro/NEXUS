@@ -10,7 +10,7 @@ import { createStore } from '../apps/service/src/lib/store-factory.mjs';
 
 async function withService(run) {
   const dataDir = await mkdtemp(join(tmpdir(), 'nexus-'));
-  const service = await createNexusService({ dataDir, port: 0 });
+  const service = await createNexusService({ dataDir, port: 0, storageMode: 'json' });
   await service.start();
   try {
     await run(service);
@@ -40,7 +40,7 @@ test('service boots and exposes the seeded internal channel map', async () => {
 test('messages persist across service restarts', async () => {
   const dataDir = await mkdtemp(join(tmpdir(), 'nexus-'));
 
-  let service = await createNexusService({ dataDir, port: 0 });
+  let service = await createNexusService({ dataDir, port: 0, storageMode: 'json' });
   await service.start();
   await fetch(`${service.url}/api/messages`, {
     method: 'POST',
@@ -54,7 +54,7 @@ test('messages persist across service restarts', async () => {
   });
   await service.stop();
 
-  service = await createNexusService({ dataDir, port: 0 });
+  service = await createNexusService({ dataDir, port: 0, storageMode: 'json' });
   await service.start();
   try {
     const messages = await fetch(`${service.url}/api/messages?actorId=identity-jack&scopeType=channel&scopeId=channel-workflow`).then((response) => response.json());

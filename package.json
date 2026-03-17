@@ -12,6 +12,7 @@
     "service:start": "node apps/service/src/server.mjs",
     "service:dev": "node --watch apps/service/src/server.mjs",
     "service:library": "node apps/service/src/server.mjs",
+    "import:chatbase": "node apps/service/src/import-chatbase.mjs",
     "desktop:start": "electron .",
     "test": "node --test"
   },

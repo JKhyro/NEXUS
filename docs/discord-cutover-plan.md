@@ -44,6 +44,17 @@ Discord must not:
 - define identity roles
 - define workflow semantics
 
+## First migration utility
+
+The first bounded migration path now exists.
+
+- `npm run import:chatbase` reads retained Discord history from LIBRARY's existing `chatbase` schema
+- it imports only adapter-mapped Discord lanes into NEXUS-native records
+- it preserves NEXUS access policy by mapping imported messages into the already-defined NEXUS channels instead of inheriting Discord permissions directly
+- it prefers existing NEXUS identities for known Discord authors and only falls back to synthetic Discord identities when no internal match exists
+
+This importer is intentionally narrow. It is designed to move real retained history into NEXUS without pretending that every Discord surface has already been re-modeled perfectly.
+
 ## Migration intent
 
 The first internal use of NEXUS should feel like entering the new product, not living inside a long-term Discord mirror.

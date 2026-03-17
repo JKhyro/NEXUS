@@ -37,6 +37,7 @@ NEXUS is the in-house communications and coordination product that replaces Disc
 npm install
 npm run service:start
 npm run service:library
+npm run import:chatbase
 npm run desktop:start
 npm test
 ```
@@ -62,6 +63,10 @@ $env:NEXUS_LIBRARY_METABASE_SCHEMA = 'nexus_metabase'
 The product contract stays the same across both modes. JSON is only the bootstrap backend; LIBRARY-backed persistence is the intended long-term path.
 
 For normal local use, copy [config/nexus.local.example.json](config/nexus.local.example.json) to `config/nexus.local.json` and fill in the real LIBRARY connection details. The service and desktop shell will pick that file up automatically.
+
+## CHATBASE import
+
+`npm run import:chatbase` imports retained Discord history from the existing LIBRARY `chatbase` schema into NEXUS-native records using the active Discord adapter channel mappings. The first importer pass is intentionally bounded to adapter-mapped channels, so it brings over known lanes without redefining NEXUS access policy.
 
 ## Architecture records
 

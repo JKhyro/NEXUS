@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import pg from 'pg';
 
 import { BaseNexusStore } from './base-store.mjs';
+import { syncBootstrapMetabase } from './bootstrap-sync.mjs';
 
 const { Pool } = pg;
 
@@ -118,6 +119,12 @@ export class LibraryPostgresStore extends BaseNexusStore {
     }
 
     await this.reload();
+
+    const synced = syncBootstrapMetabase(this.metabase, bootstrap, nowIso());
+    if (synced.changed) {
+      this.metabase = synced.metabase;
+      await this.saveMetabase();
+    }
   }
 
   async reload() {
