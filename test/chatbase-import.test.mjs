@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildDiscordChannelMap,
   buildDiscordForumImportRules,
+  buildDiscordThreadParentMap,
   buildImportedIdentity,
   matchDiscordAuthorToIdentity,
   resolveDiscordForumImportTarget
@@ -54,6 +55,22 @@ test('buildDiscordForumImportRules collects Discord forum routing rules', () => 
   assert.equal(rules.length, 2);
   assert.equal(rules[0].id, 'rule-one');
   assert.equal(rules[1].channelId, 'channel-library');
+});
+
+test('buildDiscordThreadParentMap prefers retained parent metadata when present', () => {
+  const parentMap = buildDiscordThreadParentMap([
+    {
+      channel_id: '1481138305155338320',
+      parent_channel_id: '1481091195013955664'
+    },
+    {
+      channel_id: '1481168107031494787',
+      parent_channel_id: '1481883341161631844'
+    }
+  ]);
+
+  assert.equal(parentMap.get('1481138305155338320'), '1481091195013955664');
+  assert.equal(parentMap.get('1481168107031494787'), '1481883341161631844');
 });
 
 test('resolveDiscordForumImportTarget routes retained Discord forum threads deterministically', () => {

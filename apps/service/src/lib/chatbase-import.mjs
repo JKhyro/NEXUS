@@ -63,6 +63,20 @@ export function buildDiscordForumImportRules(metabase) {
   return rules;
 }
 
+export function buildDiscordThreadParentMap(eventRows = []) {
+  const parentMap = new Map();
+  for (const row of eventRows) {
+    const parentChannelId = String(row.parent_channel_id ?? '').trim();
+    if (!parentChannelId) {
+      continue;
+    }
+
+    parentMap.set(String(row.channel_id), parentChannelId);
+  }
+
+  return parentMap;
+}
+
 export function resolveDiscordForumImportTarget(rules, sourceChannel, firstMessage) {
   const title = sourceChannel?.name ?? '';
   const body = firstMessage?.content ?? '';
@@ -233,10 +247,25 @@ async function loadSourceState({ connectionString, sourceSchema, directChannelId
       [sourceChannelIds]
     );
 
+    const parentEvents = await client.query(
+      `
+        SELECT
+          dme.channel_id,
+          COALESCE(dme.payload_json->'raw'->>'parentId', dme.payload_json->'raw'->>'parent_id') AS parent_channel_id,
+          dme.observed_at
+        FROM ${sourceSchema}.discord_message_events dme
+        WHERE dme.channel_id = ANY($1::text[])
+          AND COALESCE(dme.payload_json->'raw'->>'parentId', dme.payload_json->'raw'->>'parent_id') IS NOT NULL
+        ORDER BY dme.observed_at ASC, dme.channel_id ASC;
+      `,
+      [sourceChannelIds]
+    );
+
     return {
       channels: channels.rows,
       messages: messages.rows,
-      attachments: attachments.rows
+      attachments: attachments.rows,
+      parentEvents: parentEvents.rows
     };
   }
   finally {
@@ -283,6 +312,7 @@ export async function importChatbaseIntoNexus(options = {}) {
     });
 
     const sourceChannelsById = new Map(source.channels.map((channel) => [channel.channel_id, channel]));
+    const threadParentMap = buildDiscordThreadParentMap(source.parentEvents);
     const firstMessageByChannelId = new Map();
     for (const row of source.messages) {
       if (!firstMessageByChannelId.has(row.channel_id)) {
@@ -341,6 +371,7 @@ export async function importChatbaseIntoNexus(options = {}) {
     let importedMessages = 0;
     let importedAttachments = 0;
     let importedEvents = 0;
+    let importedScopesWithRecoveredParent = 0;
 
     function ensureForumPost(sourceChannelId) {
       const cached = scopeCache.get(sourceChannelId);
@@ -369,10 +400,26 @@ export async function importChatbaseIntoNexus(options = {}) {
         return null;
       }
 
+      const externalParentChannelId = threadParentMap.get(sourceChannelId) ?? null;
+      const mappedParentChannelId = externalParentChannelId
+        ? channelMap.get(externalParentChannelId) ?? null
+        : null;
       const firstMessage = firstMessageByChannelId.get(sourceChannelId);
-      const importRule = resolveDiscordForumImportTarget(forumImportRules, sourceChannel, firstMessage);
-      if (!importRule?.channelId) {
-        return null;
+      let targetChannelId = mappedParentChannelId;
+      let importRuleId = null;
+      let importStrategy = mappedParentChannelId ? 'recovered-parent' : 'forum-rule';
+
+      if (!targetChannelId) {
+        const importRule = resolveDiscordForumImportTarget(forumImportRules, sourceChannel, firstMessage);
+        if (!importRule?.channelId) {
+          return null;
+        }
+
+        targetChannelId = importRule.channelId;
+        importRuleId = importRule.id ?? null;
+        if (externalParentChannelId) {
+          importStrategy = 'recovered-parent-fallback-rule';
+        }
       }
 
       if (String(sourceChannel.channel_type) === '11') {
@@ -383,28 +430,35 @@ export async function importChatbaseIntoNexus(options = {}) {
             : 'identity-jack';
           store.chatbase.posts.push({
             id: postId,
-            channelId: importRule.channelId,
+            channelId: targetChannelId,
             title: sourceChannel.name ?? `Imported Discord post ${sourceChannelId}`,
             createdAt: new Date(firstMessage?.created_at ?? sourceChannel.first_seen_at ?? sourceChannel.last_seen_at ?? Date.now()).toISOString(),
             createdByIdentityId,
             source: {
               system: 'discord',
               externalChannelId: sourceChannelId,
+              externalParentChannelId,
               externalChannelType: sourceChannel.channel_type,
               importedBy: 'nexus-chatbase-import',
-              importRuleId: importRule.id ?? null
+              importRuleId,
+              importStrategy
             },
             raw: sourceChannel.raw_json ?? {}
           });
           importedPostIds.add(postId);
           importedPosts += 1;
+          if (mappedParentChannelId) {
+            importedScopesWithRecoveredParent += 1;
+          }
         }
 
         const scope = {
           scopeType: 'post',
           scopeId: postId,
-          targetChannelId: importRule.channelId,
-          importRuleId: importRule.id ?? null,
+          targetChannelId,
+          importRuleId,
+          importStrategy,
+          externalParentChannelId,
           externalScopeChannelId: sourceChannelId
         };
         scopeCache.set(sourceChannelId, scope);
@@ -418,7 +472,7 @@ export async function importChatbaseIntoNexus(options = {}) {
           : 'identity-jack';
         store.chatbase.threads.push({
           id: threadId,
-          channelId: importRule.channelId,
+          channelId: targetChannelId,
           postId: null,
           title: sourceChannel.name ?? `Imported Discord thread ${sourceChannelId}`,
           createdAt: new Date(firstMessage?.created_at ?? sourceChannel.first_seen_at ?? sourceChannel.last_seen_at ?? Date.now()).toISOString(),
@@ -426,21 +480,28 @@ export async function importChatbaseIntoNexus(options = {}) {
           source: {
             system: 'discord',
             externalChannelId: sourceChannelId,
+            externalParentChannelId,
             externalChannelType: sourceChannel.channel_type,
             importedBy: 'nexus-chatbase-import',
-            importRuleId: importRule.id ?? null
+            importRuleId,
+            importStrategy
           },
           raw: sourceChannel.raw_json ?? {}
         });
         importedThreadIds.add(threadId);
         importedThreads += 1;
+        if (mappedParentChannelId) {
+          importedScopesWithRecoveredParent += 1;
+        }
       }
 
       const scope = {
         scopeType: 'thread',
         scopeId: threadId,
-        targetChannelId: importRule.channelId,
-        importRuleId: importRule.id ?? null,
+        targetChannelId,
+        importRuleId,
+        importStrategy,
+        externalParentChannelId,
         externalScopeChannelId: sourceChannelId
       };
       scopeCache.set(sourceChannelId, scope);
@@ -472,13 +533,15 @@ export async function importChatbaseIntoNexus(options = {}) {
         source: {
           system: 'discord',
           externalChannelId: row.channel_id,
+          externalParentChannelId: scope.externalParentChannelId ?? null,
           externalMessageId: row.message_id,
           externalAuthorId: row.author_id ?? null,
           channelName: row.channel_name,
           channelTopic: row.channel_topic ?? null,
           routedChannelId: scope.targetChannelId,
           importedBy: 'nexus-chatbase-import',
-          importRuleId: scope.importRuleId
+          importRuleId: scope.importRuleId,
+          importStrategy: scope.importStrategy
         },
         attachmentIds,
         editedAt: row.edited_at ? new Date(row.edited_at).toISOString() : null,
@@ -513,10 +576,12 @@ export async function importChatbaseIntoNexus(options = {}) {
         source: {
           system: 'discord',
           externalChannelId: row.channel_id,
+          externalParentChannelId: scope.externalParentChannelId ?? null,
           externalMessageId: row.message_id,
           routedChannelId: scope.targetChannelId,
           importedBy: 'nexus-chatbase-import',
-          importRuleId: scope.importRuleId
+          importRuleId: scope.importRuleId,
+          importStrategy: scope.importStrategy
         },
         raw: {
           externalChannelId: row.channel_id,
@@ -543,12 +608,14 @@ export async function importChatbaseIntoNexus(options = {}) {
       },
       mappedChannels: channelMap.size,
       forumImportRules: forumImportRules.length,
+      recoveredParentMappings: threadParentMap.size,
       sourceChannels: source.channels.length,
       sourceMessages: source.messages.length,
       sourceAttachments: source.attachments.length,
       importedIdentities: newIdentities.length,
       importedPosts,
       importedThreads,
+      importedScopesWithRecoveredParent,
       importedMessages,
       importedAttachments,
       importedEvents

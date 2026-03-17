@@ -104,6 +104,8 @@ For normal local use, copy [config/nexus.local.example.json](config/nexus.local.
 
 The importer now also carries retained Discord forum posts into native NEXUS posts when the retained source only preserves thread-channel rows. Those forum posts are routed through explicit bootstrap rules so investigation-style posts land in `investigation`, issue-style posts land in `report`, and unmatched retained forum posts fall back to `library` instead of being dropped.
 
+When retained Discord event payloads preserve a thread `parentId`, the importer now uses that recovered parent mapping as the authoritative source for the target NEXUS forum lane and only falls back to forum-routing rules when the retained source genuinely lacks parent metadata.
+
 ## Architecture records
 
 - [First-pass architecture brief](docs/first-pass-architecture.md)

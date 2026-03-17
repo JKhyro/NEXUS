@@ -55,7 +55,7 @@ The first bounded migration path now exists.
 - `npm run import:chatbase` reads retained Discord history from LIBRARY's existing `chatbase` schema
 - it imports only adapter-mapped Discord lanes into NEXUS-native records
 - it imports retained Discord forum-thread channels as native NEXUS posts instead of flattening them into ordinary channel messages
-- it uses explicit bootstrap forum-routing rules when the retained Discord source does not preserve parent forum ids
+- it uses recovered retained parent forum ids when event payloads preserve them, and only falls back to explicit bootstrap forum-routing rules when the retained Discord source does not preserve parent forum ids
 - it preserves NEXUS access policy by mapping imported messages into the already-defined NEXUS channels instead of inheriting Discord permissions directly
 - it prefers existing NEXUS identities for known Discord authors and only falls back to synthetic Discord identities when no internal match exists
 
