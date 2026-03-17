@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createNexusService } from '../apps/service/src/server.mjs';
+import { resolveServiceConfig } from '../apps/service/src/lib/config.mjs';
 import { createStore } from '../apps/service/src/lib/store-factory.mjs';
 
 async function withService(run) {
@@ -80,7 +81,7 @@ test('discord adapter ingress maps transport events into NEXUS channels', async 
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         type: 'message.created',
-        externalChannelId: 'discord-workflow',
+        externalChannelId: '1481091195013955664',
         externalMessageId: 'discord-123',
         actorId: 'identity-kira',
         content: 'Adapter ingress message'
@@ -143,4 +144,21 @@ test('store factory defaults to JSON mode and validates library-postgres configu
       libraryConnectionString: ''
     });
   }, /NEXUS_LIBRARY_CONNECTION_STRING/);
+});
+
+test('service config can load library-postgres settings from a local config file', async () => {
+  const configDir = await mkdtemp(join(tmpdir(), 'nexus-config-'));
+  const configPath = join(configDir, 'nexus.local.json');
+  await writeFile(configPath, JSON.stringify({
+    storageMode: 'library-postgres',
+    libraryConnectionString: 'postgresql://example:secret@127.0.0.1:5432/library',
+    libraryChatbaseSchema: 'nexus_chatbase_cfg',
+    libraryMetabaseSchema: 'nexus_metabase_cfg'
+  }, null, 2));
+
+  const resolved = resolveServiceConfig({ configPath, port: 0 });
+  assert.equal(resolved.storageMode, 'library-postgres');
+  assert.equal(resolved.libraryConnectionString, 'postgresql://example:secret@127.0.0.1:5432/library');
+  assert.equal(resolved.libraryChatbaseSchema, 'nexus_chatbase_cfg');
+  assert.equal(resolved.libraryMetabaseSchema, 'nexus_metabase_cfg');
 });

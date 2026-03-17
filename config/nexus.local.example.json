@@ -1,0 +1,6 @@
+{
+  "storageMode": "library-postgres",
+  "libraryConnectionString": "postgresql://user:password@127.0.0.1:5432/library",
+  "libraryChatbaseSchema": "nexus_chatbase",
+  "libraryMetabaseSchema": "nexus_metabase"
+}

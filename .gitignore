@@ -2,3 +2,4 @@ node_modules/
 runtime/
 .electron/
 npm-debug.log*
+config/nexus.local.json

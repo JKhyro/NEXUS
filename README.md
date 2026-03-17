@@ -61,6 +61,8 @@ $env:NEXUS_LIBRARY_METABASE_SCHEMA = 'nexus_metabase'
 
 The product contract stays the same across both modes. JSON is only the bootstrap backend; LIBRARY-backed persistence is the intended long-term path.
 
+For normal local use, copy [config/nexus.local.example.json](config/nexus.local.example.json) to `config/nexus.local.json` and fill in the real LIBRARY connection details. The service and desktop shell will pick that file up automatically.
+
 ## Architecture records
 
 - [First-pass architecture brief](docs/first-pass-architecture.md)

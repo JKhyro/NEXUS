@@ -199,13 +199,19 @@
       "direction": "ingest-relay",
       "workspaceId": "workspace-internal-core",
       "channelMappings": [
-        { "externalChannelId": "discord-workflow", "channelId": "channel-workflow" },
-        { "externalChannelId": "discord-requests", "channelId": "channel-requests" },
-        { "externalChannelId": "discord-report", "channelId": "channel-report" },
-        { "externalChannelId": "discord-general", "channelId": "channel-general" },
-        { "externalChannelId": "discord-council", "channelId": "channel-council" },
-        { "externalChannelId": "discord-library", "channelId": "channel-library" },
-        { "externalChannelId": "discord-kira", "channelId": "channel-kira" }
+        { "externalChannelId": "1481091195013955664", "channelId": "channel-workflow" },
+        { "externalChannelId": "1481093718919483616", "channelId": "channel-requests" },
+        { "externalChannelId": "1481840691066700038", "channelId": "channel-report" },
+        { "externalChannelId": "1476080822124675135", "channelId": "channel-general" },
+        { "externalChannelId": "1480925690688700590", "channelId": "channel-council" },
+        { "externalChannelId": "1480925572153606234", "channelId": "channel-library" },
+        { "externalChannelId": "1480382282320580708", "channelId": "channel-kira" },
+        { "externalChannelId": "1480382365158346762", "channelId": "channel-hera" },
+        { "externalChannelId": "1480382410209362040", "channelId": "channel-yura" },
+        { "externalChannelId": "1480382568645005393", "channelId": "channel-aura" },
+        { "externalChannelId": "1480382452592672798", "channelId": "channel-sara" },
+        { "externalChannelId": "1480382523468025866", "channelId": "channel-tyra" },
+        { "externalChannelId": "1480382676694339646", "channelId": "channel-nora" }
       ]
     }
   ]
