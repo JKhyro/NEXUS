@@ -96,6 +96,75 @@ textarea {
   gap: 18px;
 }
 
+.breadcrumb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 251, 246, 0.88)),
+    radial-gradient(circle at top right, rgba(15, 107, 90, 0.08), transparent 34%);
+}
+
+.breadcrumb-card-copy {
+  line-height: 1.45;
+}
+
+.route-breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.breadcrumb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 107, 90, 0.16);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--accent-strong);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.breadcrumb-chip-button {
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.breadcrumb-chip-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(15, 107, 90, 0.28);
+}
+
+.breadcrumb-chip.current {
+  background: var(--accent);
+  color: white;
+  border-color: transparent;
+}
+
+.breadcrumb-placeholder {
+  color: var(--muted);
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.breadcrumb-separator {
+  color: var(--muted);
+  font-weight: 700;
+  opacity: 0.75;
+}
+
 .panel-header,
 .subsection-header {
   display: flex;
@@ -690,5 +759,9 @@ pre {
 
   .attachment-draft {
     grid-template-columns: 1fr;
+  }
+
+  .route-breadcrumbs {
+    gap: 8px;
   }
 }

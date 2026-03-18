@@ -6,6 +6,7 @@ import {
 import {
   buildSelectionRouteUrl,
   buildSelectionRouteHash,
+  deriveBreadcrumbRoute,
   parseSelectionRouteHash
 } from './selection-route.mjs';
 
@@ -44,6 +45,8 @@ const healthEl = document.querySelector('#health');
 const searchEl = document.querySelector('#search');
 const searchResultsEl = document.querySelector('#search-results');
 const scopeSummaryEl = document.querySelector('#scope-summary');
+const breadcrumbCardCopyEl = document.querySelector('#breadcrumb-card-copy');
+const routeBreadcrumbsEl = document.querySelector('#route-breadcrumbs');
 const copyScopeLinkEl = document.querySelector('#copy-scope-link');
 const copyMessageLinkEl = document.querySelector('#copy-message-link');
 const linkActionCopyEl = document.querySelector('#link-action-copy');
@@ -314,60 +317,92 @@ function currentMessageSelection() {
 }
 
 function currentRouteBreadcrumbs() {
-  const crumbs = [
-    { level: 'actor', label: actorName(selectedActor()) },
-    { level: 'workspace', label: currentWorkspaceLabel() }
-  ];
-
   const directConversation = currentDirectConversation();
   const channel = currentChannel();
   const post = currentPost();
   const thread = currentThread();
   const message = currentMessage();
+  const route = message ? currentMessageSelection() : currentScopeSelection();
 
-  if (directConversation) {
-    crumbs.push({ level: 'direct', label: directConversationLabel(directConversation) });
-  }
-  else if (channel) {
-    crumbs.push({ level: 'channel', label: channel.name });
-
-    if (post) {
-      crumbs.push({ level: 'post', label: post.title });
+  return deriveBreadcrumbRoute(route).map((crumb) => {
+    if (crumb.level === 'workspace') {
+      return { level: crumb.level, label: currentWorkspaceLabel() };
     }
 
-    if (thread) {
-      crumbs.push({ level: 'thread', label: thread.title });
+    if (crumb.level === 'direct') {
+      return { level: crumb.level, label: directConversation ? directConversationLabel(directConversation) : crumb.id };
     }
-  }
 
-  if (message) {
-    crumbs.push({ level: 'message', label: 'Selected message' });
-  }
+    if (crumb.level === 'channel') {
+      return { level: crumb.level, label: channel?.name ?? crumb.id };
+    }
 
-  return crumbs;
+    if (crumb.level === 'post') {
+      return { level: crumb.level, label: post?.title ?? crumb.id };
+    }
+
+    if (crumb.level === 'thread') {
+      return { level: crumb.level, label: thread?.title ?? crumb.id };
+    }
+
+    if (crumb.level === 'message') {
+      return {
+        level: crumb.level,
+        label: message ? `Message by ${actorName(message.authorIdentityId)}` : crumb.id
+      };
+    }
+
+    return { level: crumb.level, label: crumb.id };
+  });
 }
 
 function renderBreadcrumbTrail() {
   const crumbs = currentRouteBreadcrumbs();
+  if (crumbs.length === 0) {
+    return `
+      <span class="breadcrumb-chip breadcrumb-placeholder">Workspace</span>
+      <span class="breadcrumb-separator" aria-hidden="true">/</span>
+      <span class="breadcrumb-chip breadcrumb-placeholder">Scope</span>
+      <span class="breadcrumb-separator" aria-hidden="true">/</span>
+      <span class="breadcrumb-chip breadcrumb-placeholder">Message</span>
+    `;
+  }
+
   return crumbs.map((crumb, index) => {
     const isLast = index === crumbs.length - 1;
     const label = escapeHtml(crumb.label);
     if (isLast) {
-      return `<span class="pill" aria-current="page" style="padding:6px 10px;font-size:0.78rem;line-height:1;">${label}</span>`;
+      return `<span class="breadcrumb-chip current" aria-current="page">${label}</span>`;
     }
 
-    return `<button type="button" class="ghost-button" data-breadcrumb-level="${escapeHtml(crumb.level)}" style="padding:6px 10px;font-size:0.78rem;line-height:1;">${label}</button>`;
-  }).join('<span class="muted" aria-hidden="true">/</span>');
+    return `<button type="button" class="breadcrumb-chip breadcrumb-chip-button" data-breadcrumb-level="${escapeHtml(crumb.level)}">${label}</button>`;
+  }).join('<span class="breadcrumb-separator" aria-hidden="true">/</span>');
+}
+
+function renderBreadcrumbs() {
+  const message = currentMessage();
+  if (!state.selectedScope && !state.selectedChannelId && !state.selectedDirectConversationId) {
+    breadcrumbCardCopyEl.textContent = `Acting as ${actorName(selectedActor())}. Select a scope to make the current route legible and navigable.`;
+  }
+  else if (message) {
+    breadcrumbCardCopyEl.textContent = `Acting as ${actorName(selectedActor())} in ${currentScopeLabel()}. The selected message is active in the route context.`;
+  }
+  else {
+    breadcrumbCardCopyEl.textContent = `Acting as ${actorName(selectedActor())} in ${currentScopeLabel()}. Use the breadcrumbs to step back through broader readable context.`;
+  }
+
+  routeBreadcrumbsEl.innerHTML = renderBreadcrumbTrail();
 }
 
 async function navigateBreadcrumb(level) {
-  if (level === 'actor') {
-    actorSelect.dispatchEvent(new Event('change'));
-    return;
-  }
-
   if (level === 'workspace') {
-    workspaceSelect.dispatchEvent(new Event('change'));
+    state.selectedDirectConversationId = null;
+    state.selectedChannelId = state.channels[0]?.id ?? null;
+    state.selectedPostId = null;
+    state.selectedThreadId = null;
+    state.selectedMessageId = null;
+    state.coordinationFocusMode = 'scope';
+    await syncSelection();
     return;
   }
 

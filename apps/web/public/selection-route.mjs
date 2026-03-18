@@ -15,6 +15,35 @@ export function parseSelectionRouteHash(hash) {
   };
 }
 
+export function deriveBreadcrumbRoute(route) {
+  const trail = [];
+
+  if (route.workspaceId) {
+    trail.push({ level: 'workspace', id: route.workspaceId });
+  }
+
+  if (route.directConversationId) {
+    trail.push({ level: 'direct', id: route.directConversationId });
+  }
+  else if (route.channelId) {
+    trail.push({ level: 'channel', id: route.channelId });
+
+    if (route.postId) {
+      trail.push({ level: 'post', id: route.postId });
+    }
+
+    if (route.threadId) {
+      trail.push({ level: 'thread', id: route.threadId });
+    }
+  }
+
+  if (route.messageId) {
+    trail.push({ level: 'message', id: route.messageId });
+  }
+
+  return trail;
+}
+
 export function buildSelectionRouteHash(selection) {
   const params = new URLSearchParams();
 
