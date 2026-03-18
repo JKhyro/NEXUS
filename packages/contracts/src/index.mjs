@@ -16,12 +16,32 @@ function assertString(payload, field) {
   assert(typeof payload?.[field] === 'string' && payload[field].trim().length > 0, `Expected ${field} to be a non-empty string.`);
 }
 
+function assertOptionalString(payload, field) {
+  if (payload?.[field] === undefined) {
+    return;
+  }
+
+  assertString(payload, field);
+}
+
 function assertOptionalArray(payload, field) {
   if (payload?.[field] === undefined) {
     return;
   }
 
   assert(Array.isArray(payload[field]), `Expected ${field} to be an array when provided.`);
+}
+
+function assertOptionalScope(payload, prefix) {
+  const typeField = `${prefix}ScopeType`;
+  const idField = `${prefix}ScopeId`;
+  if (payload?.[typeField] === undefined && payload?.[idField] === undefined) {
+    return;
+  }
+
+  assertString(payload, typeField);
+  assert(scopeTypes.includes(payload[typeField]), `Unsupported ${typeField}: ${payload[typeField]}`);
+  assertString(payload, idField);
 }
 
 export function validateMessageCreateInput(payload) {
@@ -78,6 +98,30 @@ export function validateExternalReferenceCreateInput(payload) {
   return payload;
 }
 
+export function validateRelayCreateInput(payload) {
+  assertString(payload, 'actorId');
+  assertString(payload, 'scopeType');
+  assert(scopeTypes.includes(payload.scopeType), `Unsupported scopeType: ${payload.scopeType}`);
+  assertString(payload, 'scopeId');
+  assertString(payload, 'reason');
+  assertOptionalScope(payload, 'from');
+  assertOptionalScope(payload, 'to');
+  assertOptionalString(payload, 'messageId');
+  return payload;
+}
+
+export function validateHandoffCreateInput(payload) {
+  assertString(payload, 'actorId');
+  assertString(payload, 'scopeType');
+  assert(scopeTypes.includes(payload.scopeType), `Unsupported scopeType: ${payload.scopeType}`);
+  assertString(payload, 'scopeId');
+  assertString(payload, 'toIdentityId');
+  assertString(payload, 'rationale');
+  assertOptionalString(payload, 'fromIdentityId');
+  assertOptionalString(payload, 'messageId');
+  return payload;
+}
+
 export function validateDiscordEventInput(payload) {
   assertString(payload, 'type');
   assert(payload.type === 'message.created', 'Only Discord message.created events are supported in the MVP.');
@@ -85,5 +129,13 @@ export function validateDiscordEventInput(payload) {
   assertString(payload, 'externalMessageId');
   assertString(payload, 'actorId');
   assertString(payload, 'content');
+  assertOptionalArray(payload, 'attachments');
+  assertOptionalString(payload, 'relayReason');
+  if (payload?.handoff !== undefined) {
+    assert(typeof payload.handoff === 'object' && payload.handoff !== null && !Array.isArray(payload.handoff), 'Expected handoff to be an object when provided.');
+    assertString(payload.handoff, 'toIdentityId');
+    assertString(payload.handoff, 'rationale');
+    assertOptionalString(payload.handoff, 'fromIdentityId');
+  }
   return payload;
 }

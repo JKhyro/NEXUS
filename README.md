@@ -96,7 +96,7 @@ The current desktop/web client can:
 - browse imported and newly created attachment metadata inline with messages
 - create forum posts and ordinary messages with inline attachment metadata through the same service contract
 - browse and create external references on scopes and selected messages for ANVIL, GitHub, or Discord-linked context
-- inspect relay and handoff records for the current scope to verify cross-lane movement during Discord cutover
+- inspect and create relay and handoff records for the current scope to verify and record cross-lane movement during Discord cutover
 - search visible history and jump into matching channel, post, thread, or direct scopes
 
 For normal local use, copy [config/nexus.local.example.json](config/nexus.local.example.json) to `config/nexus.local.json` and fill in the real LIBRARY connection details. The service and desktop shell will pick that file up automatically.
@@ -108,6 +108,10 @@ For normal local use, copy [config/nexus.local.example.json](config/nexus.local.
 The importer now also carries retained Discord forum posts into native NEXUS posts when the retained source only preserves thread-channel rows. Those forum posts are routed through explicit bootstrap rules so investigation-style posts land in `investigation`, issue-style posts land in `report`, and unmatched retained forum posts fall back to `library` instead of being dropped.
 
 When retained Discord event payloads preserve a thread `parentId`, the importer now uses that recovered parent mapping as the authoritative source for the target NEXUS forum lane and only falls back to forum-routing rules when the retained source genuinely lacks parent metadata.
+
+The importer also derives durable relay records for imported Discord messages. That backfills cutover diagnostics into already-imported NEXUS history instead of limiting relay visibility to fresh adapter traffic only.
+
+Live `POST /api/adapters/discord/events` ingress now persists a relay record for every accepted Discord message and may persist an accompanying handoff record when the adapter payload includes a `handoff` object. The cutover diagnostics surface is therefore backed by durable CHATBASE records, not sidecar logs.
 
 ## Architecture records
 

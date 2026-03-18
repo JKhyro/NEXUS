@@ -6,6 +6,7 @@ import {
   buildDiscordForumImportRules,
   buildDiscordThreadParentMap,
   buildImportedIdentity,
+  buildImportedRelayRecord,
   matchDiscordAuthorToIdentity,
   resolveDiscordForumImportTarget
 } from '../apps/service/src/lib/chatbase-import.mjs';
@@ -145,6 +146,36 @@ test('buildImportedIdentity creates a deterministic fallback identity for unmapp
   assert.equal(identity.slug, 'outsideuser');
   assert.equal(identity.displayName, 'Outside User');
   assert.equal(identity.kind, 'human');
+});
+
+test('buildImportedRelayRecord anchors imported Discord ingress to native scopes', () => {
+  const relay = buildImportedRelayRecord({
+    row: {
+      message_id: 'discord-123',
+      channel_id: '1481840691066700038',
+      created_at: '2026-03-18T00:00:00.000Z'
+    },
+    scope: {
+      scopeType: 'post',
+      scopeId: 'post-discord-1481138305155338320',
+      targetChannelId: 'channel-report',
+      importRuleId: 'discord-forum-report',
+      importStrategy: 'recovered-parent',
+      externalParentChannelId: '1481840691066700038'
+    },
+    importedMessageId: 'message-discord-discord-123',
+    authorIdentityId: 'identity-hera'
+  });
+
+  assert.equal(relay.id, 'relay-discord-import-discord-123');
+  assert.equal(relay.scopeType, 'post');
+  assert.equal(relay.scopeId, 'post-discord-1481138305155338320');
+  assert.equal(relay.toScopeType, 'channel');
+  assert.equal(relay.toScopeId, 'channel-report');
+  assert.equal(relay.actorIdentityId, 'identity-hera');
+  assert.equal(relay.messageId, 'message-discord-discord-123');
+  assert.equal(relay.source.externalChannelId, '1481840691066700038');
+  assert.equal(relay.source.importStrategy, 'recovered-parent');
 });
 
 test('syncBootstrapMetabase refreshes bootstrap-owned metadata while preserving extras', () => {

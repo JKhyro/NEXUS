@@ -481,6 +481,10 @@ button:disabled {
   min-height: 164px;
 }
 
+.compact-field textarea {
+  min-height: 88px;
+}
+
 .thread-parent-copy {
   margin: 0;
 }

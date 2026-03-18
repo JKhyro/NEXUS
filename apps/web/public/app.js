@@ -41,6 +41,14 @@ const relayCopyEl = document.querySelector('#relay-copy');
 const relayListEl = document.querySelector('#relay-list');
 const handoffCopyEl = document.querySelector('#handoff-copy');
 const handoffListEl = document.querySelector('#handoff-list');
+const relayComposerEl = document.querySelector('#relay-composer');
+const relayTargetEl = document.querySelector('#relay-target');
+const relayReasonEl = document.querySelector('#relay-reason');
+const relaySubmitEl = document.querySelector('#relay-submit');
+const handoffComposerEl = document.querySelector('#handoff-composer');
+const handoffTargetEl = document.querySelector('#handoff-target');
+const handoffRationaleEl = document.querySelector('#handoff-rationale');
+const handoffSubmitEl = document.querySelector('#handoff-submit');
 const referenceComposerEl = document.querySelector('#reference-composer');
 const referenceOwnerEl = document.querySelector('#reference-owner');
 const referenceSystemEl = document.querySelector('#reference-system');
@@ -413,6 +421,40 @@ function currentReferenceOwners() {
   return owners;
 }
 
+function currentCoordinationTargets() {
+  const targets = new Map();
+  if (state.selectedScope) {
+    targets.set(referenceOwnerValue(state.selectedScope.scopeType, state.selectedScope.scopeId), {
+      value: referenceOwnerValue(state.selectedScope.scopeType, state.selectedScope.scopeId),
+      label: `Current scope (${currentScopeLabel()})`
+    });
+  }
+
+  for (const channel of state.channels) {
+    const value = referenceOwnerValue('channel', channel.id);
+    if (targets.has(value)) {
+      continue;
+    }
+    targets.set(value, {
+      value,
+      label: `Channel (${channel.name})`
+    });
+  }
+
+  for (const directConversation of state.directConversations) {
+    const value = referenceOwnerValue('direct', directConversation.id);
+    if (targets.has(value)) {
+      continue;
+    }
+    targets.set(value, {
+      value,
+      label: `Direct (${directConversationLabel(directConversation)})`
+    });
+  }
+
+  return [...targets.values()];
+}
+
 function renderReferenceOwnerOptions() {
   const previousValue = referenceOwnerEl.value;
   const owners = currentReferenceOwners();
@@ -437,6 +479,58 @@ function renderReferenceOwnerOptions() {
     : owners[0]?.value ?? '';
   referenceOwnerEl.disabled = owners.length === 0;
   referenceSubmitEl.disabled = owners.length === 0;
+}
+
+function renderCoordinationComposerOptions() {
+  const previousRelayTarget = relayTargetEl.value;
+  const previousHandoffTarget = handoffTargetEl.value;
+  const targets = currentCoordinationTargets();
+  relayTargetEl.innerHTML = '';
+
+  for (const target of targets) {
+    const option = document.createElement('option');
+    option.value = target.value;
+    option.textContent = target.label;
+    relayTargetEl.appendChild(option);
+  }
+
+  if (!targets.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'No relay target';
+    relayTargetEl.appendChild(option);
+  }
+
+  const handoffTargets = state.identities.filter((identity) => identity.id !== selectedActor());
+  handoffTargetEl.innerHTML = '';
+  for (const identity of handoffTargets) {
+    const option = document.createElement('option');
+    option.value = identity.id;
+    option.textContent = `${identity.displayName} (${identity.kind})`;
+    handoffTargetEl.appendChild(option);
+  }
+
+  if (!handoffTargets.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'No handoff target';
+    handoffTargetEl.appendChild(option);
+  }
+
+  const canCoordinate = Boolean(state.selectedScope);
+  relayTargetEl.value = targets.some((target) => target.value === previousRelayTarget)
+    ? previousRelayTarget
+    : targets[0]?.value ?? '';
+  handoffTargetEl.value = handoffTargets.some((identity) => identity.id === previousHandoffTarget)
+    ? previousHandoffTarget
+    : handoffTargets[0]?.id ?? '';
+
+  relayTargetEl.disabled = !canCoordinate || targets.length === 0;
+  relayReasonEl.disabled = !canCoordinate;
+  relaySubmitEl.disabled = !canCoordinate || targets.length === 0;
+  handoffTargetEl.disabled = !canCoordinate || handoffTargets.length === 0;
+  handoffRationaleEl.disabled = !canCoordinate;
+  handoffSubmitEl.disabled = !canCoordinate || handoffTargets.length === 0;
 }
 
 function renderReferenceCards(container, references, emptyText) {
@@ -794,6 +888,7 @@ function renderCoordinationRecords() {
 
   renderRecordCards(relayListEl, state.relays, 'relay', 'No relays touch the current scope yet.');
   renderRecordCards(handoffListEl, state.handoffs, 'handoff', 'No handoffs touch the current scope yet.');
+  renderCoordinationComposerOptions();
 }
 
 function renderScopeSummary() {
@@ -1501,6 +1596,78 @@ referenceComposerEl.addEventListener('submit', async (event) => {
     await loadExternalReferences();
     renderAll();
     setStatus(`Created external reference on ${owner.ownerType}.`, 'success');
+  }
+  catch (error) {
+    setStatus(error.message, 'error');
+  }
+});
+
+relayComposerEl.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!state.selectedScope) {
+    setStatus('Select a scope before creating a relay.', 'error');
+    return;
+  }
+
+  const target = parseReferenceOwnerValue(relayTargetEl.value);
+  if (!target) {
+    setStatus('Choose a relay target.', 'error');
+    return;
+  }
+
+  if (!relayReasonEl.value.trim()) {
+    setStatus('Relays need a reason.', 'error');
+    return;
+  }
+
+  try {
+    await postJson('/api/relays', {
+      actorId: selectedActor(),
+      scopeType: state.selectedScope.scopeType,
+      scopeId: state.selectedScope.scopeId,
+      toScopeType: target.ownerType,
+      toScopeId: target.ownerId,
+      reason: relayReasonEl.value.trim()
+    });
+    relayReasonEl.value = '';
+    await loadCoordinationRecords();
+    renderAll();
+    setStatus(`Created relay from ${currentScopeLabel()}.`, 'success');
+  }
+  catch (error) {
+    setStatus(error.message, 'error');
+  }
+});
+
+handoffComposerEl.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!state.selectedScope) {
+    setStatus('Select a scope before creating a handoff.', 'error');
+    return;
+  }
+
+  if (!handoffTargetEl.value) {
+    setStatus('Choose a handoff target identity.', 'error');
+    return;
+  }
+
+  if (!handoffRationaleEl.value.trim()) {
+    setStatus('Handoffs need a rationale.', 'error');
+    return;
+  }
+
+  try {
+    await postJson('/api/handoffs', {
+      actorId: selectedActor(),
+      scopeType: state.selectedScope.scopeType,
+      scopeId: state.selectedScope.scopeId,
+      toIdentityId: handoffTargetEl.value,
+      rationale: handoffRationaleEl.value.trim()
+    });
+    handoffRationaleEl.value = '';
+    await loadCoordinationRecords();
+    renderAll();
+    setStatus(`Created handoff in ${currentScopeLabel()}.`, 'success');
   }
   catch (error) {
     setStatus(error.message, 'error');

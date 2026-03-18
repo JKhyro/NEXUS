@@ -56,10 +56,19 @@ The first bounded migration path now exists.
 - it imports only adapter-mapped Discord lanes into NEXUS-native records
 - it imports retained Discord forum-thread channels as native NEXUS posts instead of flattening them into ordinary channel messages
 - it uses recovered retained parent forum ids when event payloads preserve them, and only falls back to explicit bootstrap forum-routing rules when the retained Discord source does not preserve parent forum ids
+- it derives durable relay records for imported Discord messages, even when the message history was imported in an earlier run, so cutover diagnostics can be backfilled into existing NEXUS history
 - it preserves NEXUS access policy by mapping imported messages into the already-defined NEXUS channels instead of inheriting Discord permissions directly
 - it prefers existing NEXUS identities for known Discord authors and only falls back to synthetic Discord identities when no internal match exists
 
 This importer is intentionally narrow. It is designed to move real retained history into NEXUS without pretending that every Discord surface has already been re-modeled perfectly.
+
+## Live adapter diagnostics
+
+During transition, live Discord ingress should create more than messages.
+
+- every accepted Discord adapter event should persist a relay record in NEXUS
+- optional cutover handoffs should persist as handoff records in the mapped NEXUS scope
+- the relay and handoff client surface should therefore be backed by durable records instead of transient logs or ad hoc debugging
 
 ## Migration intent
 

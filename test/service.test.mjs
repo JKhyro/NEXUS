@@ -97,9 +97,9 @@ test('channel write policy can be narrower than channel read policy', async () =
   });
 });
 
-test('discord adapter ingress maps transport events into NEXUS channels', async () => {
+test('discord adapter ingress maps transport events into NEXUS channels and persists cutover diagnostics', async () => {
   await withService(async (service) => {
-    await fetch(`${service.url}/api/adapters/discord/events`, {
+    const ingested = await fetch(`${service.url}/api/adapters/discord/events`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -107,14 +107,27 @@ test('discord adapter ingress maps transport events into NEXUS channels', async 
         externalChannelId: '1481091195013955664',
         externalMessageId: 'discord-123',
         actorId: 'identity-kira',
-        content: 'Adapter ingress message'
+        content: 'Adapter ingress message',
+        handoff: {
+          toIdentityId: 'identity-librarian',
+          rationale: 'Needs curator follow-up after ingress'
+        }
       })
-    });
+    }).then((response) => response.json());
 
     const messages = await fetch(`${service.url}/api/messages?actorId=identity-kira&scopeType=channel&scopeId=channel-workflow`).then((response) => response.json());
+    const relays = await fetch(`${service.url}/api/relays?actorId=identity-kira&scopeType=channel&scopeId=channel-workflow`).then((response) => response.json());
+    const handoffs = await fetch(`${service.url}/api/handoffs?actorId=identity-kira&scopeType=channel&scopeId=channel-workflow`).then((response) => response.json());
     const found = messages.find((message) => message.body === 'Adapter ingress message');
     assert(found);
     assert.equal(found.source.system, 'discord');
+    assert.equal(ingested.relayId, relays[0].id);
+    assert.equal(ingested.handoffId, handoffs[0].id);
+    assert.equal(relays.length, 1);
+    assert.equal(relays[0].messageId, found.id);
+    assert.equal(relays[0].reason, 'Discord adapter ingress');
+    assert.equal(handoffs.length, 1);
+    assert.equal(handoffs[0].toIdentityId, 'identity-librarian');
   });
 });
 
@@ -312,6 +325,41 @@ test('relays and handoffs can be listed for a readable scope', async () => {
     assert.equal(relays[0].id, 'relay-report-requests');
     assert.equal(handoffs.length, 1);
     assert.equal(handoffs[0].id, 'handoff-requests-librarian');
+  });
+});
+
+test('relays and handoffs can be created through the shared service contract', async () => {
+  await withService(async (service) => {
+    const relay = await fetch(`${service.url}/api/relays`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        scopeType: 'channel',
+        scopeId: 'channel-requests',
+        toScopeType: 'channel',
+        toScopeId: 'channel-workflow',
+        reason: 'Needs tracked execution follow-up'
+      })
+    }).then((response) => response.json());
+
+    const handoff = await fetch(`${service.url}/api/handoffs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        scopeType: 'channel',
+        scopeId: 'channel-requests',
+        toIdentityId: 'identity-kira',
+        rationale: 'Take the next turn on execution planning'
+      })
+    }).then((response) => response.json());
+
+    const relays = await fetch(`${service.url}/api/relays?actorId=identity-jack&scopeType=channel&scopeId=channel-requests`).then((response) => response.json());
+    const handoffs = await fetch(`${service.url}/api/handoffs?actorId=identity-jack&scopeType=channel&scopeId=channel-requests`).then((response) => response.json());
+
+    assert(relays.some((entry) => entry.id === relay.id && entry.toScopeId === 'channel-workflow'));
+    assert(handoffs.some((entry) => entry.id === handoff.id && entry.toIdentityId === 'identity-kira'));
   });
 });
 

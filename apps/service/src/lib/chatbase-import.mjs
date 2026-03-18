@@ -164,6 +164,42 @@ function buildImportedEventId(messageId) {
   return `event-discord-import-${messageId}`;
 }
 
+function buildImportedRelayId(messageId) {
+  return `relay-discord-import-${messageId}`;
+}
+
+export function buildImportedRelayRecord({ row, scope, importedMessageId, authorIdentityId }) {
+  const occurredAt = new Date(row.created_at).toISOString();
+  return {
+    id: buildImportedRelayId(row.message_id),
+    scopeType: scope.scopeType,
+    scopeId: scope.scopeId,
+    toScopeType: 'channel',
+    toScopeId: scope.targetChannelId,
+    actorIdentityId: authorIdentityId,
+    messageId: importedMessageId,
+    reason: 'Imported Discord adapter ingress',
+    occurredAt,
+    source: {
+      system: 'discord',
+      externalChannelId: row.channel_id,
+      externalParentChannelId: scope.externalParentChannelId ?? null,
+      externalMessageId: row.message_id,
+      routedChannelId: scope.targetChannelId,
+      importedBy: 'nexus-chatbase-import',
+      importRuleId: scope.importRuleId,
+      importStrategy: scope.importStrategy
+    },
+    raw: {
+      externalChannelId: row.channel_id,
+      externalMessageId: row.message_id,
+      scopeType: scope.scopeType,
+      scopeId: scope.scopeId,
+      targetChannelId: scope.targetChannelId
+    }
+  };
+}
+
 async function loadSourceState({ connectionString, sourceSchema, directChannelIds }) {
   const client = new Client({ connectionString });
   try {
@@ -330,6 +366,7 @@ export async function importChatbaseIntoNexus(options = {}) {
     const importedMessageIds = new Set(store.chatbase.messages.map((message) => message.id));
     const importedPostIds = new Set(store.chatbase.posts.map((post) => post.id));
     const importedThreadIds = new Set(store.chatbase.threads.map((thread) => thread.id));
+    const importedRelayIds = new Set(store.chatbase.relays.map((relay) => relay.id));
     const identityIds = new Set(store.metabase.identities.map((identity) => identity.id));
     const newIdentities = [];
     const authorIdentityMap = new Map();
@@ -370,6 +407,8 @@ export async function importChatbaseIntoNexus(options = {}) {
     let importedThreads = 0;
     let importedMessages = 0;
     let importedAttachments = 0;
+    let importedRelays = 0;
+    let importedHandoffs = 0;
     let importedEvents = 0;
     let importedScopesWithRecoveredParent = 0;
 
@@ -510,18 +549,30 @@ export async function importChatbaseIntoNexus(options = {}) {
 
     for (const row of source.messages) {
       const importedMessageId = buildImportedMessageId(row.message_id);
-      if (importedMessageIds.has(importedMessageId)) {
-        continue;
-      }
-
       const scope = ensureForumPost(row.channel_id);
       if (!scope) {
         continue;
       }
 
+      const authorIdentityId = buildAuthorIdentityId(authorIdentityMap, row);
+      const importedRelayId = buildImportedRelayId(row.message_id);
+      if (!importedRelayIds.has(importedRelayId)) {
+        store.chatbase.relays.push(buildImportedRelayRecord({
+          row,
+          scope,
+          importedMessageId,
+          authorIdentityId
+        }));
+        importedRelayIds.add(importedRelayId);
+        importedRelays += 1;
+      }
+
+      if (importedMessageIds.has(importedMessageId)) {
+        continue;
+      }
+
       const attachmentRows = attachmentsByMessage.get(row.message_id) ?? [];
       const attachmentIds = attachmentRows.map((attachment) => buildImportedAttachmentId(attachment.attachment_id));
-      const authorIdentityId = buildAuthorIdentityId(authorIdentityMap, row);
 
       store.chatbase.messages.push({
         id: importedMessageId,
@@ -596,7 +647,7 @@ export async function importChatbaseIntoNexus(options = {}) {
       importedEvents += 1;
     }
 
-    if (importedPosts > 0 || importedThreads > 0 || importedMessages > 0 || importedAttachments > 0 || importedEvents > 0) {
+    if (importedPosts > 0 || importedThreads > 0 || importedMessages > 0 || importedAttachments > 0 || importedRelays > 0 || importedHandoffs > 0 || importedEvents > 0) {
       await store.saveChatbase();
     }
 
@@ -618,6 +669,8 @@ export async function importChatbaseIntoNexus(options = {}) {
       importedScopesWithRecoveredParent,
       importedMessages,
       importedAttachments,
+      importedRelays,
+      importedHandoffs,
       importedEvents
     };
   }

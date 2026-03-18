@@ -198,6 +198,17 @@
                 <span id="relay-copy" class="muted">Select a scope to inspect relay records.</span>
               </div>
               <div id="relay-list" class="reference-list"></div>
+              <form id="relay-composer" class="composer compact-composer">
+                <label class="field compact-field">
+                  <span>Relay to</span>
+                  <select id="relay-target"></select>
+                </label>
+                <label class="field compact-field">
+                  <span>Reason</span>
+                  <input id="relay-reason" type="text" placeholder="Why should this move or be visible there?">
+                </label>
+                <button id="relay-submit" type="submit">Create Relay</button>
+              </form>
             </div>
             <div class="reference-group">
               <div class="reference-group-header">
@@ -205,6 +216,17 @@
                 <span id="handoff-copy" class="muted">Select a scope to inspect handoff records.</span>
               </div>
               <div id="handoff-list" class="reference-list"></div>
+              <form id="handoff-composer" class="composer compact-composer">
+                <label class="field compact-field">
+                  <span>Hand off to</span>
+                  <select id="handoff-target"></select>
+                </label>
+                <label class="field compact-field">
+                  <span>Rationale</span>
+                  <textarea id="handoff-rationale" rows="3" placeholder="Why does this identity need the next turn?"></textarea>
+                </label>
+                <button id="handoff-submit" type="submit">Create Handoff</button>
+              </form>
             </div>
           </div>
 

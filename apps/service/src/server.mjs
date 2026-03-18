@@ -190,6 +190,14 @@ async function routeApi(request, response, store, config) {
     return sendJson(request, response, config, 201, await store.createExternalReference(await readBody(request)));
   }
 
+  if (request.method === 'POST' && url.pathname === '/api/relays') {
+    return sendJson(request, response, config, 201, await store.createRelay(await readBody(request)));
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/handoffs') {
+    return sendJson(request, response, config, 201, await store.createHandoff(await readBody(request)));
+  }
+
   if (request.method === 'POST' && url.pathname === '/api/adapters/discord/events') {
     return sendJson(request, response, config, 201, await store.ingestDiscordEvent(await readBody(request)));
   }

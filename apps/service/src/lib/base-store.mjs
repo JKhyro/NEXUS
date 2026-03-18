@@ -2,8 +2,10 @@ import {
   validateDirectConversationCreateInput,
   validateDiscordEventInput,
   validateExternalReferenceCreateInput,
+  validateHandoffCreateInput,
   validateMessageCreateInput,
   validatePostCreateInput,
+  validateRelayCreateInput,
   validateThreadCreateInput
 } from '../../../../packages/contracts/src/index.mjs';
 import { createId } from './ids.mjs';
@@ -146,6 +148,59 @@ export class BaseNexusStore {
   listHandoffs(actorId, scopeType, scopeId) {
     assertReadableScope(this, actorId, scopeType, scopeId);
     return this.chatbase.handoffs.filter((handoff) => recordTouchesScope(handoff, scopeType, scopeId));
+  }
+
+  async createRelay(input) {
+    validateRelayCreateInput(input);
+    assertReadableScope(this, input.actorId, input.scopeType, input.scopeId);
+    if (input.toScopeType && input.toScopeId) {
+      assertReadableScope(this, input.actorId, input.toScopeType, input.toScopeId);
+    }
+    if (input.fromScopeType && input.fromScopeId) {
+      assertReadableScope(this, input.actorId, input.fromScopeType, input.fromScopeId);
+    }
+
+    const relay = {
+      id: createId('relay'),
+      scopeType: input.scopeType,
+      scopeId: input.scopeId,
+      fromScopeType: input.fromScopeType ?? null,
+      fromScopeId: input.fromScopeId ?? null,
+      toScopeType: input.toScopeType ?? null,
+      toScopeId: input.toScopeId ?? null,
+      actorIdentityId: input.actorId,
+      messageId: input.messageId ?? null,
+      reason: input.reason,
+      occurredAt: input.occurredAt ?? nowIso(),
+      source: input.source ?? { system: 'nexus', transport: 'local-service' },
+      raw: input.raw ?? {}
+    };
+
+    this.chatbase.relays.push(relay);
+    await this.saveChatbase();
+    return relay;
+  }
+
+  async createHandoff(input) {
+    validateHandoffCreateInput(input);
+    assertWritableScope(this, input.actorId, input.scopeType, input.scopeId);
+
+    const handoff = {
+      id: createId('handoff'),
+      scopeType: input.scopeType,
+      scopeId: input.scopeId,
+      fromIdentityId: input.fromIdentityId ?? input.actorId,
+      toIdentityId: input.toIdentityId,
+      messageId: input.messageId ?? null,
+      rationale: input.rationale,
+      createdAt: input.createdAt ?? nowIso(),
+      source: input.source ?? { system: 'nexus', transport: 'local-service' },
+      raw: input.raw ?? {}
+    };
+
+    this.chatbase.handoffs.push(handoff);
+    await this.saveChatbase();
+    return handoff;
   }
 
   listExternalReferences(actorId, ownerType, ownerId) {
@@ -342,19 +397,60 @@ export class BaseNexusStore {
       throw new Error(`No Discord channel mapping found for ${input.externalChannelId}.`);
     }
 
+    const source = {
+      system: 'discord',
+      adapterEndpointId: endpoint?.id ?? null,
+      externalChannelId: input.externalChannelId,
+      externalMessageId: input.externalMessageId,
+      direction: 'ingest'
+    };
+
     const created = await this.createMessage({
       actorId: input.actorId,
       scopeType: 'channel',
       scopeId: mapping.channelId,
       body: input.content,
       attachments: input.attachments ?? [],
-      source: {
-        system: 'discord',
-        externalChannelId: input.externalChannelId,
-        externalMessageId: input.externalMessageId
+      source
+    });
+
+    const relay = await this.createRelay({
+      actorId: input.actorId,
+      scopeType: 'channel',
+      scopeId: mapping.channelId,
+      toScopeType: 'channel',
+      toScopeId: mapping.channelId,
+      messageId: created.message.id,
+      occurredAt: created.message.createdAt,
+      reason: input.relayReason ?? 'Discord adapter ingress',
+      source,
+      raw: {
+        eventType: input.type
       }
     });
 
-    return created.message;
+    let handoff = null;
+    if (input.handoff) {
+      handoff = await this.createHandoff({
+        actorId: input.actorId,
+        scopeType: 'channel',
+        scopeId: mapping.channelId,
+        fromIdentityId: input.handoff.fromIdentityId ?? input.actorId,
+        toIdentityId: input.handoff.toIdentityId,
+        messageId: created.message.id,
+        createdAt: created.message.createdAt,
+        rationale: input.handoff.rationale,
+        source,
+        raw: {
+          eventType: input.type
+        }
+      });
+    }
+
+    return {
+      ...created.message,
+      relayId: relay.id,
+      handoffId: handoff?.id ?? null
+    };
   }
 }
