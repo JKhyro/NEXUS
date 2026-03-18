@@ -397,7 +397,7 @@ function renderBreadcrumbs() {
 async function navigateBreadcrumb(level) {
   if (level === 'workspace') {
     state.selectedDirectConversationId = null;
-    state.selectedChannelId = state.channels[0]?.id ?? null;
+    state.selectedChannelId = null;
     state.selectedPostId = null;
     state.selectedThreadId = null;
     state.selectedMessageId = null;
@@ -1389,9 +1389,6 @@ function renderScopeHeader() {
     scopeContextEl.className = 'scope-context';
     scopeContextEl.innerHTML = `
       <div class="eyebrow">Direct conversation</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;">
-        ${renderBreadcrumbTrail()}
-      </div>
       <strong>${escapeHtml(directConversationLabel(directConversation))}</strong>
       <span>${escapeHtml(directConversationMembers(directConversation))}</span>
     `;
@@ -1404,12 +1401,7 @@ function renderScopeHeader() {
     channelTopicEl.className = 'topic-card empty';
     channelTopicEl.textContent = 'Channel guidance will appear here.';
     scopeContextEl.className = 'scope-context empty';
-    scopeContextEl.innerHTML = `
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-        ${renderBreadcrumbTrail()}
-      </div>
-      <div style="margin-top:12px;">No scope selected.</div>
-    `;
+    scopeContextEl.textContent = 'No scope selected.';
     return;
   }
 
@@ -1422,9 +1414,6 @@ function renderScopeHeader() {
     scopeContextEl.className = 'scope-context';
     scopeContextEl.innerHTML = `
       <div class="eyebrow">Thread</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;">
-        ${renderBreadcrumbTrail()}
-      </div>
       <strong>${escapeHtml(thread.title)}</strong>
       <span>${escapeHtml(actorName(thread.createdByIdentityId))} | ${escapeHtml(formatTimestamp(thread.createdAt))}</span>
     `;
@@ -1435,9 +1424,6 @@ function renderScopeHeader() {
     scopeContextEl.className = 'scope-context';
     scopeContextEl.innerHTML = `
       <div class="eyebrow">Post</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;">
-        ${renderBreadcrumbTrail()}
-      </div>
       <strong>${escapeHtml(post.title)}</strong>
       <span>${escapeHtml(actorName(post.createdByIdentityId))} | ${escapeHtml(formatTimestamp(post.createdAt))}</span>
     `;
@@ -1446,27 +1432,19 @@ function renderScopeHeader() {
 
   if (channel.kind === 'forum') {
     scopeContextEl.className = 'scope-context empty';
-    scopeContextEl.innerHTML = `
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-        ${renderBreadcrumbTrail()}
-      </div>
-      <div style="margin-top:12px;">Select an existing post or create a new one to start the conversation.</div>
-    `;
+    scopeContextEl.textContent = 'Select an existing post or create a new one to start the conversation.';
     return;
   }
 
   scopeContextEl.className = 'scope-context';
   scopeContextEl.innerHTML = `
     <div class="eyebrow">Channel</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;">
-      ${renderBreadcrumbTrail()}
-    </div>
     <strong>${escapeHtml(channel.name)}</strong>
     <span>${escapeHtml(channel.kind)} lane</span>
   `;
 }
 
-scopeContextEl.addEventListener('click', (event) => {
+routeBreadcrumbsEl.addEventListener('click', (event) => {
   const button = event.target.closest('[data-breadcrumb-level]');
   if (!button || button.disabled) {
     return;
@@ -1750,6 +1728,7 @@ function renderAll() {
   renderMessages();
   renderExternalReferences();
   renderCoordinationRecords();
+  renderBreadcrumbs();
   renderScopeHeader();
   renderScopeSummary();
   renderLinkActions();
