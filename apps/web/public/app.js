@@ -228,6 +228,10 @@ function currentMessage() {
   return state.messages.find((message) => message.id === state.selectedMessageId) ?? null;
 }
 
+function currentWorkspaceLabel() {
+  return workspaceSelect.selectedOptions[0]?.textContent ?? selectedWorkspace();
+}
+
 function hasSelectionRoute(route) {
   return Boolean(
     route.actorId ||
@@ -307,6 +311,118 @@ function currentMessageSelection() {
     messageId: state.selectedMessageId,
     coordinationFocusMode: currentCoordinationFocusMode()
   };
+}
+
+function currentRouteBreadcrumbs() {
+  const crumbs = [
+    { level: 'actor', label: actorName(selectedActor()) },
+    { level: 'workspace', label: currentWorkspaceLabel() }
+  ];
+
+  const directConversation = currentDirectConversation();
+  const channel = currentChannel();
+  const post = currentPost();
+  const thread = currentThread();
+  const message = currentMessage();
+
+  if (directConversation) {
+    crumbs.push({ level: 'direct', label: directConversationLabel(directConversation) });
+  }
+  else if (channel) {
+    crumbs.push({ level: 'channel', label: channel.name });
+
+    if (post) {
+      crumbs.push({ level: 'post', label: post.title });
+    }
+
+    if (thread) {
+      crumbs.push({ level: 'thread', label: thread.title });
+    }
+  }
+
+  if (message) {
+    crumbs.push({ level: 'message', label: 'Selected message' });
+  }
+
+  return crumbs;
+}
+
+function renderBreadcrumbTrail() {
+  const crumbs = currentRouteBreadcrumbs();
+  return crumbs.map((crumb, index) => {
+    const isLast = index === crumbs.length - 1;
+    const label = escapeHtml(crumb.label);
+    if (isLast) {
+      return `<span class="pill" aria-current="page" style="padding:6px 10px;font-size:0.78rem;line-height:1;">${label}</span>`;
+    }
+
+    return `<button type="button" class="ghost-button" data-breadcrumb-level="${escapeHtml(crumb.level)}" style="padding:6px 10px;font-size:0.78rem;line-height:1;">${label}</button>`;
+  }).join('<span class="muted" aria-hidden="true">/</span>');
+}
+
+async function navigateBreadcrumb(level) {
+  if (level === 'actor') {
+    actorSelect.dispatchEvent(new Event('change'));
+    return;
+  }
+
+  if (level === 'workspace') {
+    workspaceSelect.dispatchEvent(new Event('change'));
+    return;
+  }
+
+  const directConversation = currentDirectConversation();
+  const channel = currentChannel();
+  const post = currentPost();
+  const thread = currentThread();
+
+  if (level === 'direct' && directConversation) {
+    state.selectedDirectConversationId = directConversation.id;
+    state.selectedChannelId = null;
+    state.selectedPostId = null;
+    state.selectedThreadId = null;
+    state.selectedMessageId = null;
+    state.coordinationFocusMode = 'scope';
+    await syncSelection();
+    return;
+  }
+
+  if (level === 'channel' && channel) {
+    state.selectedDirectConversationId = null;
+    state.selectedChannelId = channel.id;
+    state.selectedPostId = null;
+    state.selectedThreadId = null;
+    state.selectedMessageId = null;
+    state.coordinationFocusMode = 'scope';
+    await syncSelection();
+    return;
+  }
+
+  if (level === 'post' && post) {
+    state.selectedDirectConversationId = null;
+    state.selectedChannelId = post.channelId;
+    state.selectedPostId = post.id;
+    state.selectedThreadId = null;
+    state.selectedMessageId = null;
+    state.coordinationFocusMode = 'scope';
+    await syncSelection();
+    return;
+  }
+
+  if (level === 'thread' && thread) {
+    const parent = state.threadParentIndex.get(thread.id) ?? null;
+    if (!parent) {
+      return;
+    }
+
+    state.selectedDirectConversationId = null;
+    state.selectedChannelId = parent.channelId;
+    state.selectedPostId = parent.postId ?? null;
+    state.selectedThreadId = thread.id;
+    state.selectedMessageId = null;
+    state.coordinationFocusMode = 'scope';
+    await syncSelection();
+  }
 }
 
 function syncSelectionRoute() {
@@ -1238,6 +1354,9 @@ function renderScopeHeader() {
     scopeContextEl.className = 'scope-context';
     scopeContextEl.innerHTML = `
       <div class="eyebrow">Direct conversation</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;">
+        ${renderBreadcrumbTrail()}
+      </div>
       <strong>${escapeHtml(directConversationLabel(directConversation))}</strong>
       <span>${escapeHtml(directConversationMembers(directConversation))}</span>
     `;
@@ -1250,7 +1369,12 @@ function renderScopeHeader() {
     channelTopicEl.className = 'topic-card empty';
     channelTopicEl.textContent = 'Channel guidance will appear here.';
     scopeContextEl.className = 'scope-context empty';
-    scopeContextEl.textContent = 'No scope selected.';
+    scopeContextEl.innerHTML = `
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        ${renderBreadcrumbTrail()}
+      </div>
+      <div style="margin-top:12px;">No scope selected.</div>
+    `;
     return;
   }
 
@@ -1263,6 +1387,9 @@ function renderScopeHeader() {
     scopeContextEl.className = 'scope-context';
     scopeContextEl.innerHTML = `
       <div class="eyebrow">Thread</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;">
+        ${renderBreadcrumbTrail()}
+      </div>
       <strong>${escapeHtml(thread.title)}</strong>
       <span>${escapeHtml(actorName(thread.createdByIdentityId))} | ${escapeHtml(formatTimestamp(thread.createdAt))}</span>
     `;
@@ -1273,6 +1400,9 @@ function renderScopeHeader() {
     scopeContextEl.className = 'scope-context';
     scopeContextEl.innerHTML = `
       <div class="eyebrow">Post</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;">
+        ${renderBreadcrumbTrail()}
+      </div>
       <strong>${escapeHtml(post.title)}</strong>
       <span>${escapeHtml(actorName(post.createdByIdentityId))} | ${escapeHtml(formatTimestamp(post.createdAt))}</span>
     `;
@@ -1281,17 +1411,37 @@ function renderScopeHeader() {
 
   if (channel.kind === 'forum') {
     scopeContextEl.className = 'scope-context empty';
-    scopeContextEl.textContent = 'Select an existing post or create a new one to start the conversation.';
+    scopeContextEl.innerHTML = `
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        ${renderBreadcrumbTrail()}
+      </div>
+      <div style="margin-top:12px;">Select an existing post or create a new one to start the conversation.</div>
+    `;
     return;
   }
 
   scopeContextEl.className = 'scope-context';
   scopeContextEl.innerHTML = `
     <div class="eyebrow">Channel</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;">
+      ${renderBreadcrumbTrail()}
+    </div>
     <strong>${escapeHtml(channel.name)}</strong>
     <span>${escapeHtml(channel.kind)} lane</span>
   `;
 }
+
+scopeContextEl.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-breadcrumb-level]');
+  if (!button || button.disabled) {
+    return;
+  }
+
+  event.preventDefault();
+  navigateBreadcrumb(button.dataset.breadcrumbLevel).catch((error) => {
+    setStatus(error.message, 'error');
+  });
+});
 
 function updateComposerState() {
   const directConversation = currentDirectConversation();
@@ -1933,6 +2083,7 @@ actorSelect.addEventListener('change', async () => {
 
 workspaceSelect.addEventListener('change', async () => {
   state.selectedChannelId = null;
+  state.selectedDirectConversationId = null;
   state.selectedPostId = null;
   state.selectedThreadId = null;
   state.selectedMessageId = null;
