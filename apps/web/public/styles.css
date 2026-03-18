@@ -540,6 +540,10 @@ button:disabled {
   margin-top: 10px;
 }
 
+.record-action-row {
+  margin-top: 10px;
+}
+
 .record-details summary {
   cursor: pointer;
   color: var(--accent-strong);

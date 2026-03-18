@@ -330,6 +330,17 @@ test('relays and handoffs can be listed for a readable scope', async () => {
 
 test('relays and handoffs can be created through the shared service contract', async () => {
   await withService(async (service) => {
+    const createdMessage = await fetch(`${service.url}/api/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        scopeType: 'channel',
+        scopeId: 'channel-requests',
+        body: 'Message-linked coordination source'
+      })
+    }).then((response) => response.json());
+
     const relay = await fetch(`${service.url}/api/relays`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -339,7 +350,8 @@ test('relays and handoffs can be created through the shared service contract', a
         scopeId: 'channel-requests',
         toScopeType: 'channel',
         toScopeId: 'channel-workflow',
-        reason: 'Needs tracked execution follow-up'
+        reason: 'Needs tracked execution follow-up',
+        messageId: createdMessage.message.id
       })
     }).then((response) => response.json());
 
@@ -351,15 +363,18 @@ test('relays and handoffs can be created through the shared service contract', a
         scopeType: 'channel',
         scopeId: 'channel-requests',
         toIdentityId: 'identity-kira',
-        rationale: 'Take the next turn on execution planning'
+        rationale: 'Take the next turn on execution planning',
+        messageId: createdMessage.message.id
       })
     }).then((response) => response.json());
 
     const relays = await fetch(`${service.url}/api/relays?actorId=identity-jack&scopeType=channel&scopeId=channel-requests`).then((response) => response.json());
     const handoffs = await fetch(`${service.url}/api/handoffs?actorId=identity-jack&scopeType=channel&scopeId=channel-requests`).then((response) => response.json());
+    const fetchedMessage = await fetch(`${service.url}/api/message?actorId=identity-jack&messageId=${encodeURIComponent(createdMessage.message.id)}`).then((response) => response.json());
 
-    assert(relays.some((entry) => entry.id === relay.id && entry.toScopeId === 'channel-workflow'));
-    assert(handoffs.some((entry) => entry.id === handoff.id && entry.toIdentityId === 'identity-kira'));
+    assert.equal(fetchedMessage.id, createdMessage.message.id);
+    assert(relays.some((entry) => entry.id === relay.id && entry.toScopeId === 'channel-workflow' && entry.messageId === createdMessage.message.id));
+    assert(handoffs.some((entry) => entry.id === handoff.id && entry.toIdentityId === 'identity-kira' && entry.messageId === createdMessage.message.id));
   });
 });
 

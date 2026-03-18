@@ -142,6 +142,13 @@ async function routeApi(request, response, store, config) {
     ));
   }
 
+  if (request.method === 'GET' && url.pathname === '/api/message') {
+    return sendJson(request, response, config, 200, store.getMessage(
+      actorId,
+      url.searchParams.get('messageId')
+    ));
+  }
+
   if (request.method === 'GET' && url.pathname === '/api/relays') {
     return sendJson(request, response, config, 200, store.listRelays(
       actorId,

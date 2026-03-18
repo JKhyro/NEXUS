@@ -621,6 +621,60 @@ function recordScopeLine(record) {
   );
 }
 
+async function navigateToMessage(messageId) {
+  if (!messageId) {
+    throw new Error('No related message is available for this record.');
+  }
+
+  const message = await getJson(`/api/message?actorId=${encodeURIComponent(selectedActor())}&messageId=${encodeURIComponent(messageId)}`);
+  state.selectedMessageId = message.id;
+
+  if (message.scopeType === 'channel') {
+    state.selectedDirectConversationId = null;
+    state.selectedChannelId = message.scopeId;
+    state.selectedPostId = null;
+    state.selectedThreadId = null;
+  }
+  else if (message.scopeType === 'post') {
+    const channelId = state.postChannelIndex.get(message.scopeId) ?? message.source?.routedChannelId ?? null;
+    if (!channelId) {
+      throw new Error('The related post is not available in the current channel index.');
+    }
+    state.selectedDirectConversationId = null;
+    state.selectedChannelId = channelId;
+    state.selectedPostId = message.scopeId;
+    state.selectedThreadId = null;
+  }
+  else if (message.scopeType === 'thread') {
+    const parent = state.threadParentIndex.get(message.scopeId) ?? null;
+    if (!parent) {
+      throw new Error('The related thread is not available in the current thread index.');
+    }
+    state.selectedDirectConversationId = null;
+    state.selectedChannelId = parent.channelId;
+    state.selectedPostId = parent.postId ?? null;
+    state.selectedThreadId = message.scopeId;
+  }
+  else if (message.scopeType === 'direct') {
+    state.selectedDirectConversationId = message.scopeId;
+    state.selectedChannelId = null;
+    state.selectedPostId = null;
+    state.selectedThreadId = null;
+  }
+  else {
+    throw new Error(`Unsupported related message scope: ${message.scopeType}`);
+  }
+
+  await syncSelection();
+  if (!state.messages.some((entry) => entry.id === message.id)) {
+    throw new Error('The related message could not be loaded in the selected scope.');
+  }
+
+  state.selectedMessageId = message.id;
+  await loadExternalReferences();
+  renderAll();
+}
+
 function renderRecordCards(container, records, type, emptyText) {
   container.innerHTML = '';
   if (!records.length) {
@@ -641,12 +695,26 @@ function renderRecordCards(container, records, type, emptyText) {
       </div>
       <div class="reference-card-meta">${escapeHtml(recordScopeLine(record))}</div>
       <div class="reference-card-meta">${escapeHtml(rationale)}</div>
+      ${record.messageId
+        ? `<div class="record-action-row"><button type="button" class="ghost-button record-jump">Jump to related message</button></div>`
+        : ''}
       <details class="record-details">
         <summary>Raw record</summary>
         <pre>${escapeHtml(JSON.stringify(record, null, 2))}</pre>
       </details>
       <div class="reference-card-meta">${escapeHtml(formatTimestamp(createdAt))}</div>
     `;
+
+    if (record.messageId) {
+      card.querySelector('.record-jump')?.addEventListener('click', () => {
+        navigateToMessage(record.messageId).then(() => {
+          setStatus('Jumped to the related message.', 'success');
+        }).catch((error) => {
+          setStatus(error.message, 'error');
+        });
+      });
+    }
+
     container.appendChild(card);
   }
 }
@@ -1621,13 +1689,15 @@ relayComposerEl.addEventListener('submit', async (event) => {
   }
 
   try {
+    const message = currentMessage();
     await postJson('/api/relays', {
       actorId: selectedActor(),
       scopeType: state.selectedScope.scopeType,
       scopeId: state.selectedScope.scopeId,
       toScopeType: target.ownerType,
       toScopeId: target.ownerId,
-      reason: relayReasonEl.value.trim()
+      reason: relayReasonEl.value.trim(),
+      messageId: message?.id
     });
     relayReasonEl.value = '';
     await loadCoordinationRecords();
@@ -1657,12 +1727,14 @@ handoffComposerEl.addEventListener('submit', async (event) => {
   }
 
   try {
+    const message = currentMessage();
     await postJson('/api/handoffs', {
       actorId: selectedActor(),
       scopeType: state.selectedScope.scopeType,
       scopeId: state.selectedScope.scopeId,
       toIdentityId: handoffTargetEl.value,
-      rationale: handoffRationaleEl.value.trim()
+      rationale: handoffRationaleEl.value.trim(),
+      messageId: message?.id
     });
     handoffRationaleEl.value = '';
     await loadCoordinationRecords();

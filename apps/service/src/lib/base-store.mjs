@@ -140,6 +140,16 @@ export class BaseNexusStore {
     return this.hydrateMessageAttachments(messages);
   }
 
+  getMessage(actorId, messageId) {
+    const message = this.chatbase.messages.find((entry) => entry.id === messageId);
+    if (!message) {
+      throw new Error('Message not found.');
+    }
+
+    assertReadableScope(this, actorId, message.scopeType, message.scopeId);
+    return this.hydrateMessageAttachments([message])[0];
+  }
+
   listRelays(actorId, scopeType, scopeId) {
     assertReadableScope(this, actorId, scopeType, scopeId);
     return this.chatbase.relays.filter((relay) => recordTouchesScope(relay, scopeType, scopeId));
