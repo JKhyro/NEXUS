@@ -565,6 +565,32 @@ function clearReferenceComposer() {
   referenceTitleEl.value = '';
 }
 
+function coordinationCountsForMessage(messageId) {
+  const relayCount = state.relays.filter((relay) => relay.messageId === messageId).length;
+  const handoffCount = state.handoffs.filter((handoff) => handoff.messageId === messageId).length;
+  return {
+    relayCount,
+    handoffCount
+  };
+}
+
+function renderMessageCoordinationBadges(messageId) {
+  const counts = coordinationCountsForMessage(messageId);
+  const badges = [];
+  if (counts.relayCount > 0) {
+    badges.push(`<span class="pill coordination-badge relay-badge">${escapeHtml(`${counts.relayCount} relay${counts.relayCount === 1 ? '' : 's'}`)}</span>`);
+  }
+  if (counts.handoffCount > 0) {
+    badges.push(`<span class="pill coordination-badge handoff-badge">${escapeHtml(`${counts.handoffCount} handoff${counts.handoffCount === 1 ? '' : 's'}`)}</span>`);
+  }
+
+  if (badges.length === 0) {
+    return '';
+  }
+
+  return `<div class="message-coordination-row">${badges.join('')}</div>`;
+}
+
 function scopeLabelFromParts(scopeType, scopeId) {
   if (!scopeType || !scopeId) {
     return 'Unknown scope';
@@ -913,6 +939,7 @@ function renderMessages() {
         <span class="pill${sourcedFromDiscord ? ' discord' : ''}">${escapeHtml(sourceSystem)}</span>
       </div>
       <div class="message-body">${message.body ? escapeHtml(message.body) : '<span class="muted">Empty message body.</span>'}</div>
+      ${renderMessageCoordinationBadges(message.id)}
       ${renderAttachmentMarkup(message.attachments)}
     `;
     article.addEventListener('click', async () => {
@@ -1003,8 +1030,11 @@ function renderScopeSummary() {
   }
 
   if (currentMessage()) {
+    const coordination = coordinationCountsForMessage(currentMessage().id);
     summaryLines.push(`<strong>Selected Message</strong><span>${escapeHtml(actorName(currentMessage().authorIdentityId))}</span>`);
     summaryLines.push(`<strong>Message References</strong><span>${escapeHtml(state.messageExternalReferences.length)}</span>`);
+    summaryLines.push(`<strong>Message Relays</strong><span>${escapeHtml(coordination.relayCount)}</span>`);
+    summaryLines.push(`<strong>Message Handoffs</strong><span>${escapeHtml(coordination.handoffCount)}</span>`);
   }
 
   scopeSummaryEl.className = 'summary-card';
