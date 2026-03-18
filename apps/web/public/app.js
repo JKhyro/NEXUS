@@ -3,6 +3,10 @@ import {
   filterCoordinationRecords,
   normalizeCoordinationFocusMode
 } from './coordination-focus.mjs';
+import {
+  buildSelectionRouteHash,
+  parseSelectionRouteHash
+} from './selection-route.mjs';
 
 const actorSelect = document.querySelector('#actor');
 const workspaceSelect = document.querySelector('#workspace');
@@ -94,6 +98,8 @@ const state = {
   selectedScope: null,
   health: null
 };
+
+let routeSyncSuspended = true;
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -201,6 +207,18 @@ function currentMessage() {
   return state.messages.find((message) => message.id === state.selectedMessageId) ?? null;
 }
 
+function hasSelectionRoute(route) {
+  return Boolean(
+    route.actorId ||
+    route.workspaceId ||
+    route.directConversationId ||
+    route.channelId ||
+    route.postId ||
+    route.threadId ||
+    route.messageId
+  );
+}
+
 function currentScopeLabel() {
   const directConversation = currentDirectConversation();
   const channel = currentChannel();
@@ -235,6 +253,34 @@ function setStatus(message, tone = 'info') {
 
   statusEl.className = `status ${tone}`;
   statusEl.textContent = message;
+}
+
+function currentSelectionRouteHash() {
+  return buildSelectionRouteHash({
+    actorId: selectedActor(),
+    workspaceId: selectedWorkspace(),
+    directConversationId: state.selectedDirectConversationId,
+    channelId: state.selectedChannelId,
+    postId: state.selectedPostId,
+    threadId: state.selectedThreadId,
+    messageId: state.selectedMessageId,
+    coordinationFocusMode: currentCoordinationFocusMode()
+  });
+}
+
+function syncSelectionRoute() {
+  if (routeSyncSuspended) {
+    return;
+  }
+
+  const nextHash = currentSelectionRouteHash();
+  if (window.location.hash === nextHash) {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  url.hash = nextHash.startsWith('#') ? nextHash.slice(1) : nextHash;
+  history.replaceState(null, '', url);
 }
 
 function actorName(identityId) {
@@ -1461,6 +1507,115 @@ function renderAll() {
   renderScopeHeader();
   renderScopeSummary();
   updateComposerState();
+  syncSelectionRoute();
+}
+
+async function applySelectionRoute(route, options = {}) {
+  const announceFailures = options.announceFailures ?? false;
+  const previousRouteSyncState = routeSyncSuspended;
+  routeSyncSuspended = true;
+
+  try {
+    const validActorIds = new Set(state.identities.map((identity) => identity.id));
+    if (route.actorId && validActorIds.has(route.actorId) && selectedActor() !== route.actorId) {
+      actorSelect.value = route.actorId;
+      state.selectedChannelId = null;
+      state.selectedDirectConversationId = null;
+      state.selectedPostId = null;
+      state.selectedThreadId = null;
+      state.selectedMessageId = null;
+      await loadWorkspaces();
+    }
+
+    const validWorkspaceIds = new Set(Array.from(workspaceSelect.options).map((option) => option.value));
+    if (route.workspaceId && validWorkspaceIds.has(route.workspaceId)) {
+      workspaceSelect.value = route.workspaceId;
+    }
+
+    await refreshAll();
+
+    if (route.directConversationId) {
+      const conversation = state.directConversations.find((entry) => entry.id === route.directConversationId);
+      if (conversation) {
+        state.selectedDirectConversationId = conversation.id;
+        state.selectedChannelId = null;
+        state.selectedPostId = null;
+        state.selectedThreadId = null;
+      }
+    }
+    else {
+      let routeChannelId = route.channelId;
+      let routePostId = route.postId;
+      let routeThreadId = route.threadId;
+
+      if (!routeChannelId && routePostId) {
+        routeChannelId = state.postChannelIndex.get(routePostId) ?? null;
+      }
+
+      if (!routeChannelId && routeThreadId) {
+        const parent = state.threadParentIndex.get(routeThreadId) ?? null;
+        routeChannelId = parent?.channelId ?? null;
+        if (!routePostId) {
+          routePostId = parent?.postId ?? null;
+        }
+      }
+
+      if (routeChannelId && state.channels.some((channel) => channel.id === routeChannelId)) {
+        state.selectedDirectConversationId = null;
+        state.selectedChannelId = routeChannelId;
+
+        if (routePostId && state.postChannelIndex.get(routePostId) === routeChannelId) {
+          state.selectedPostId = routePostId;
+        }
+        else {
+          state.selectedPostId = null;
+        }
+
+        const threadParent = routeThreadId ? state.threadParentIndex.get(routeThreadId) ?? null : null;
+        if (
+          routeThreadId &&
+          threadParent &&
+          threadParent.channelId === routeChannelId &&
+          ((threadParent.postId ?? null) === (state.selectedPostId ?? null))
+        ) {
+          state.selectedThreadId = routeThreadId;
+        }
+        else {
+          state.selectedThreadId = null;
+        }
+      }
+    }
+
+    await syncSelection();
+
+    if (route.messageId) {
+      if (state.messages.some((message) => message.id === route.messageId)) {
+        state.selectedMessageId = route.messageId;
+        await loadExternalReferences();
+        renderAll();
+      }
+      else {
+        try {
+          await navigateToMessage(route.messageId);
+        }
+        catch (error) {
+          if (announceFailures) {
+            setStatus('The deep-linked message is unavailable for the current actor.', 'info');
+          }
+        }
+      }
+    }
+
+    state.coordinationFocusMode = route.coordinationFocusMode === 'message' && state.selectedMessageId
+      ? 'message'
+      : 'scope';
+    renderAll();
+  }
+  finally {
+    routeSyncSuspended = previousRouteSyncState;
+  }
+
+  syncSelectionRoute();
 }
 
 async function syncSelection() {
@@ -1880,6 +2035,18 @@ for (const relation of externalReferenceRelations) {
   option.textContent = relation;
   referenceRelationEl.appendChild(option);
 }
+const initialRoute = parseSelectionRouteHash(window.location.hash);
 await loadIdentities();
 await loadWorkspaces();
 await refreshAll();
+if (hasSelectionRoute(initialRoute)) {
+  await applySelectionRoute(initialRoute);
+}
+routeSyncSuspended = false;
+syncSelectionRoute();
+
+window.addEventListener('hashchange', () => {
+  applySelectionRoute(parseSelectionRouteHash(window.location.hash), { announceFailures: true }).catch((error) => {
+    setStatus(error.message, 'error');
+  });
+});
