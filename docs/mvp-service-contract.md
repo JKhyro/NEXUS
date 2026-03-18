@@ -43,6 +43,8 @@ It is intentionally small and internal-first. The contract is designed to power 
 - `GET /api/posts?actorId=...&channelId=...`
 - `GET /api/threads?actorId=...&channelId=...&postId=...`
 - `GET /api/messages?actorId=...&scopeType=...&scopeId=...`
+- `GET /api/relays?actorId=...&scopeType=...&scopeId=...`
+- `GET /api/handoffs?actorId=...&scopeType=...&scopeId=...`
 - `GET /api/search?actorId=...&q=...`
 - `GET /api/external-references?actorId=...&ownerType=...&ownerId=...`
 
@@ -72,6 +74,7 @@ It is intentionally small and internal-first. The contract is designed to power 
 - `GET /api/health` must also expose `deploymentMode`, `staticMode`, and any safe origin metadata needed to tell whether the service is running as a desktop-managed local surface or a hosted-capable/API-only surface.
 - `POST /api/messages` and `POST /api/posts` may carry inline `attachments` arrays so composition stays on the shared message contract instead of depending on a separate upload/session model in the MVP.
 - `GET /api/external-references` and `POST /api/external-references` must work uniformly for scope owners (`channel`, `post`, `thread`, `direct`) and message owners so desktop and future web clients do not fork their reference model.
+- `GET /api/relays` and `GET /api/handoffs` must filter by the selected readable scope so cutover diagnostics stay on the shared contract and do not require direct store inspection.
 - Adapter payloads may contain external transport identifiers but must map into internal NEXUS objects before persistence.
 - External references never redefine the owning object; they only link outward.
 - All persisted messages generate message events in CHATBASE.

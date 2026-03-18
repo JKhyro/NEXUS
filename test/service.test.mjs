@@ -260,6 +260,61 @@ test('external references can attach to channel, post, thread, and direct owners
   });
 });
 
+test('relays and handoffs can be listed for a readable scope', async () => {
+  await withService(async (service) => {
+    service.store.chatbase.relays.push(
+      {
+        id: 'relay-report-requests',
+        fromScopeType: 'channel',
+        fromScopeId: 'channel-report',
+        toScopeType: 'channel',
+        toScopeId: 'channel-requests',
+        reason: 'Escalated for tracked action',
+        occurredAt: '2026-03-18T00:00:00.000Z',
+        source: { system: 'discord', externalChannelId: '1481840691066700038' }
+      },
+      {
+        id: 'relay-general-workflow',
+        fromScopeType: 'channel',
+        fromScopeId: 'channel-general',
+        toScopeType: 'channel',
+        toScopeId: 'channel-workflow',
+        reason: 'Unrelated relay',
+        occurredAt: '2026-03-18T00:05:00.000Z'
+      }
+    );
+    service.store.chatbase.handoffs.push(
+      {
+        id: 'handoff-requests-librarian',
+        scopeType: 'channel',
+        scopeId: 'channel-requests',
+        fromIdentityId: 'identity-kira',
+        toIdentityId: 'identity-librarian',
+        rationale: 'Needs curator review',
+        createdAt: '2026-03-18T00:10:00.000Z'
+      },
+      {
+        id: 'handoff-general-yura',
+        scopeType: 'channel',
+        scopeId: 'channel-general',
+        fromIdentityId: 'identity-kira',
+        toIdentityId: 'identity-yura',
+        rationale: 'Unrelated handoff',
+        createdAt: '2026-03-18T00:20:00.000Z'
+      }
+    );
+    await service.store.saveChatbase();
+
+    const relays = await fetch(`${service.url}/api/relays?actorId=identity-jack&scopeType=channel&scopeId=channel-requests`).then((response) => response.json());
+    const handoffs = await fetch(`${service.url}/api/handoffs?actorId=identity-jack&scopeType=channel&scopeId=channel-requests`).then((response) => response.json());
+
+    assert.equal(relays.length, 1);
+    assert.equal(relays[0].id, 'relay-report-requests');
+    assert.equal(handoffs.length, 1);
+    assert.equal(handoffs[0].id, 'handoff-requests-librarian');
+  });
+});
+
 test('messages expose inline attachments through read and search flows', async () => {
   await withService(async (service) => {
     const created = await fetch(`${service.url}/api/messages`, {

@@ -142,6 +142,22 @@ async function routeApi(request, response, store, config) {
     ));
   }
 
+  if (request.method === 'GET' && url.pathname === '/api/relays') {
+    return sendJson(request, response, config, 200, store.listRelays(
+      actorId,
+      url.searchParams.get('scopeType'),
+      url.searchParams.get('scopeId')
+    ));
+  }
+
+  if (request.method === 'GET' && url.pathname === '/api/handoffs') {
+    return sendJson(request, response, config, 200, store.listHandoffs(
+      actorId,
+      url.searchParams.get('scopeType'),
+      url.searchParams.get('scopeId')
+    ));
+  }
+
   if (request.method === 'GET' && url.pathname === '/api/search') {
     return sendJson(request, response, config, 200, store.searchMessages(actorId, url.searchParams.get('q') ?? ''));
   }

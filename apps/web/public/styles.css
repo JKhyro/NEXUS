@@ -532,6 +532,21 @@ button:disabled {
   text-decoration: underline;
 }
 
+.record-details {
+  margin-top: 10px;
+}
+
+.record-details summary {
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.record-details pre {
+  margin-top: 10px;
+  max-height: 180px;
+}
+
 .composer-footer {
   display: flex;
   align-items: center;

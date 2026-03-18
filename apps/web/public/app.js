@@ -37,6 +37,10 @@ const scopeReferenceCopyEl = document.querySelector('#scope-reference-copy');
 const scopeReferencesEl = document.querySelector('#scope-references');
 const messageReferenceCopyEl = document.querySelector('#message-reference-copy');
 const messageReferencesEl = document.querySelector('#message-references');
+const relayCopyEl = document.querySelector('#relay-copy');
+const relayListEl = document.querySelector('#relay-list');
+const handoffCopyEl = document.querySelector('#handoff-copy');
+const handoffListEl = document.querySelector('#handoff-list');
 const referenceComposerEl = document.querySelector('#reference-composer');
 const referenceOwnerEl = document.querySelector('#reference-owner');
 const referenceSystemEl = document.querySelector('#reference-system');
@@ -62,6 +66,8 @@ const state = {
   messages: [],
   scopeExternalReferences: [],
   messageExternalReferences: [],
+  relays: [],
+  handoffs: [],
   selectedChannelId: null,
   selectedDirectConversationId: null,
   selectedPostId: null,
@@ -465,6 +471,92 @@ function clearReferenceComposer() {
   referenceTitleEl.value = '';
 }
 
+function scopeLabelFromParts(scopeType, scopeId) {
+  if (!scopeType || !scopeId) {
+    return 'Unknown scope';
+  }
+
+  if (scopeType === 'channel') {
+    const channel = state.channels.find((entry) => entry.id === scopeId);
+    return channel ? channel.name : `${scopeType}:${scopeId}`;
+  }
+
+  if (scopeType === 'post') {
+    const channelId = state.postChannelIndex.get(scopeId);
+    const post = channelId ? (state.postsByChannelId.get(channelId) ?? []).find((entry) => entry.id === scopeId) : null;
+    return post ? `Post: ${post.title}` : `${scopeType}:${scopeId}`;
+  }
+
+  if (scopeType === 'thread') {
+    const parent = state.threadParentIndex.get(scopeId);
+    const threadList = parent ? (state.threadsByParentKey.get(threadParentKey(parent.parentScopeType, parent.parentScopeId)) ?? []) : [];
+    const thread = threadList.find((entry) => entry.id === scopeId);
+    return thread ? `Thread: ${thread.title}` : `${scopeType}:${scopeId}`;
+  }
+
+  if (scopeType === 'direct') {
+    const conversation = state.directConversations.find((entry) => entry.id === scopeId);
+    return conversation ? `Direct: ${directConversationLabel(conversation)}` : `${scopeType}:${scopeId}`;
+  }
+
+  return `${scopeType}:${scopeId}`;
+}
+
+function relayPrimaryLine(relay) {
+  const from = scopeLabelFromParts(
+    relay.fromScopeType ?? relay.sourceScopeType ?? relay.fromScope?.scopeType ?? relay.source?.scopeType,
+    relay.fromScopeId ?? relay.sourceScopeId ?? relay.fromScope?.scopeId ?? relay.source?.scopeId
+  );
+  const to = scopeLabelFromParts(
+    relay.toScopeType ?? relay.targetScopeType ?? relay.toScope?.scopeType ?? relay.target?.scopeType,
+    relay.toScopeId ?? relay.targetScopeId ?? relay.toScope?.scopeId ?? relay.target?.scopeId
+  );
+  return `${from} -> ${to}`;
+}
+
+function handoffPrimaryLine(handoff) {
+  const from = actorName(handoff.fromIdentityId ?? handoff.sourceIdentityId ?? handoff.source?.identityId) || 'Unknown source';
+  const to = actorName(handoff.toIdentityId ?? handoff.targetIdentityId ?? handoff.target?.identityId) || 'Unknown target';
+  return `${from} -> ${to}`;
+}
+
+function recordScopeLine(record) {
+  return scopeLabelFromParts(
+    record.scopeType ?? record.sourceScopeType ?? record.fromScopeType ?? record.scope?.scopeType ?? record.scope?.type,
+    record.scopeId ?? record.sourceScopeId ?? record.fromScopeId ?? record.scope?.scopeId ?? record.scope?.id
+  );
+}
+
+function renderRecordCards(container, records, type, emptyText) {
+  container.innerHTML = '';
+  if (!records.length) {
+    container.innerHTML = `<div class="empty-state">${escapeHtml(emptyText)}</div>`;
+    return;
+  }
+
+  for (const record of records) {
+    const card = document.createElement('article');
+    card.className = 'reference-card';
+    const primary = type === 'relay' ? relayPrimaryLine(record) : handoffPrimaryLine(record);
+    const rationale = record.reason ?? record.rationale ?? record.summary ?? record.note ?? 'No rationale metadata';
+    const createdAt = record.occurredAt ?? record.createdAt ?? record.updatedAt ?? null;
+    card.innerHTML = `
+      <div class="reference-card-top">
+        <strong>${escapeHtml(primary)}</strong>
+        <span class="pill">${escapeHtml(type)}</span>
+      </div>
+      <div class="reference-card-meta">${escapeHtml(recordScopeLine(record))}</div>
+      <div class="reference-card-meta">${escapeHtml(rationale)}</div>
+      <details class="record-details">
+        <summary>Raw record</summary>
+        <pre>${escapeHtml(JSON.stringify(record, null, 2))}</pre>
+      </details>
+      <div class="reference-card-meta">${escapeHtml(formatTimestamp(createdAt))}</div>
+    `;
+    container.appendChild(card);
+  }
+}
+
 function directConversationLabel(conversation) {
   const otherMembers = conversation.memberIdentityIds.filter((identityId) => identityId !== selectedActor());
   const names = (otherMembers.length > 0 ? otherMembers : conversation.memberIdentityIds).map((identityId) => actorName(identityId));
@@ -692,6 +784,18 @@ function renderExternalReferences() {
   renderReferenceOwnerOptions();
 }
 
+function renderCoordinationRecords() {
+  relayCopyEl.textContent = state.selectedScope
+    ? `${currentScopeLabel()} | ${state.relays.length} relay${state.relays.length === 1 ? '' : 's'}`
+    : 'Select a scope to inspect relay records.';
+  handoffCopyEl.textContent = state.selectedScope
+    ? `${currentScopeLabel()} | ${state.handoffs.length} handoff${state.handoffs.length === 1 ? '' : 's'}`
+    : 'Select a scope to inspect handoff records.';
+
+  renderRecordCards(relayListEl, state.relays, 'relay', 'No relays touch the current scope yet.');
+  renderRecordCards(handoffListEl, state.handoffs, 'handoff', 'No handoffs touch the current scope yet.');
+}
+
 function renderScopeSummary() {
   const directConversation = currentDirectConversation();
   const channel = currentChannel();
@@ -712,6 +816,8 @@ function renderScopeSummary() {
     summaryLines.push(`<strong>Scope</strong><span>${escapeHtml(state.selectedScope ? `${state.selectedScope.scopeType}:${state.selectedScope.scopeId}` : 'none')}</span>`);
     summaryLines.push(`<strong>Visible Messages</strong><span>${escapeHtml(state.messages.length)}</span>`);
     summaryLines.push(`<strong>Scope References</strong><span>${escapeHtml(state.scopeExternalReferences.length)}</span>`);
+    summaryLines.push(`<strong>Scope Relays</strong><span>${escapeHtml(state.relays.length)}</span>`);
+    summaryLines.push(`<strong>Scope Handoffs</strong><span>${escapeHtml(state.handoffs.length)}</span>`);
   }
   else {
     summaryLines.push(`<strong>Channel</strong><span>${escapeHtml(channel.name)}</span>`);
@@ -721,6 +827,8 @@ function renderScopeSummary() {
     summaryLines.push(`<strong>Visible Threads</strong><span>${escapeHtml(currentThreads().length)}</span>`);
     summaryLines.push(`<strong>Visible Messages</strong><span>${escapeHtml(state.messages.length)}</span>`);
     summaryLines.push(`<strong>Scope References</strong><span>${escapeHtml(state.scopeExternalReferences.length)}</span>`);
+    summaryLines.push(`<strong>Scope Relays</strong><span>${escapeHtml(state.relays.length)}</span>`);
+    summaryLines.push(`<strong>Scope Handoffs</strong><span>${escapeHtml(state.handoffs.length)}</span>`);
 
     if (post?.source?.system === 'discord') {
       summaryLines.push(`<strong>Imported From</strong><span>${escapeHtml(`Discord forum thread ${post.source.externalChannelId}`)}</span>`);
@@ -1057,6 +1165,21 @@ async function loadExternalReferences() {
   }
 }
 
+async function loadCoordinationRecords() {
+  if (!state.selectedScope) {
+    state.relays = [];
+    state.handoffs = [];
+    return;
+  }
+
+  state.relays = await getJson(
+    `/api/relays?actorId=${encodeURIComponent(selectedActor())}&scopeType=${encodeURIComponent(state.selectedScope.scopeType)}&scopeId=${encodeURIComponent(state.selectedScope.scopeId)}`
+  );
+  state.handoffs = await getJson(
+    `/api/handoffs?actorId=${encodeURIComponent(selectedActor())}&scopeType=${encodeURIComponent(state.selectedScope.scopeType)}&scopeId=${encodeURIComponent(state.selectedScope.scopeId)}`
+  );
+}
+
 function renderAll() {
   renderScopeShell();
   renderChannels();
@@ -1065,6 +1188,7 @@ function renderAll() {
   renderThreads();
   renderMessages();
   renderExternalReferences();
+  renderCoordinationRecords();
   renderScopeHeader();
   renderScopeSummary();
   updateComposerState();
@@ -1085,6 +1209,7 @@ async function syncSelection() {
       state.selectedMessageId = null;
     }
     await loadExternalReferences();
+    await loadCoordinationRecords();
     renderAll();
     return;
   }
@@ -1095,6 +1220,7 @@ async function syncSelection() {
     state.messages = [];
     state.selectedMessageId = null;
     await loadExternalReferences();
+    await loadCoordinationRecords();
     renderAll();
     return;
   }
@@ -1159,6 +1285,7 @@ async function syncSelection() {
     state.selectedMessageId = null;
   }
   await loadExternalReferences();
+  await loadCoordinationRecords();
   renderAll();
 }
 

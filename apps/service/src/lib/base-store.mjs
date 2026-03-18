@@ -13,6 +13,30 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function recordTouchesScope(record, scopeType, scopeId) {
+  const candidates = [
+    [record.scopeType, record.scopeId],
+    [record.fromScopeType, record.fromScopeId],
+    [record.toScopeType, record.toScopeId],
+    [record.sourceScopeType, record.sourceScopeId],
+    [record.targetScopeType, record.targetScopeId],
+    [record.scope?.scopeType, record.scope?.scopeId],
+    [record.scope?.type, record.scope?.id],
+    [record.fromScope?.scopeType, record.fromScope?.scopeId],
+    [record.fromScope?.type, record.fromScope?.id],
+    [record.toScope?.scopeType, record.toScope?.scopeId],
+    [record.toScope?.type, record.toScope?.id],
+    [record.source?.scopeType, record.source?.scopeId],
+    [record.source?.type, record.source?.id],
+    [record.target?.scopeType, record.target?.scopeId],
+    [record.target?.type, record.target?.id]
+  ];
+
+  return candidates.some(([candidateType, candidateId]) => {
+    return candidateType === scopeType && candidateId === scopeId;
+  });
+}
+
 export class BaseNexusStore {
   constructor() {
     this.metabase = null;
@@ -112,6 +136,16 @@ export class BaseNexusStore {
       return message.scopeType === scopeType && message.scopeId === scopeId;
     });
     return this.hydrateMessageAttachments(messages);
+  }
+
+  listRelays(actorId, scopeType, scopeId) {
+    assertReadableScope(this, actorId, scopeType, scopeId);
+    return this.chatbase.relays.filter((relay) => recordTouchesScope(relay, scopeType, scopeId));
+  }
+
+  listHandoffs(actorId, scopeType, scopeId) {
+    assertReadableScope(this, actorId, scopeType, scopeId);
+    return this.chatbase.handoffs.filter((handoff) => recordTouchesScope(handoff, scopeType, scopeId));
   }
 
   listExternalReferences(actorId, ownerType, ownerId) {
