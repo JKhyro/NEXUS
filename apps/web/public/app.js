@@ -11,6 +11,10 @@ import {
 } from './selection-route.mjs';
 import {
   buildLinkedContextSelection,
+  groupLinkedContextResults,
+  linkedContextOwnerTypeFilters,
+  normalizeLinkedContextOwnerTypeFilter,
+  summarizeLinkedContextFilter,
   summarizeLinkedContextCoordination,
   summarizeLinkedContextPath
 } from './linked-context.mjs';
@@ -73,6 +77,8 @@ const scopeReferencesEl = document.querySelector('#scope-references');
 const messageReferenceCopyEl = document.querySelector('#message-reference-copy');
 const messageReferencesEl = document.querySelector('#message-references');
 const linkedContextCopyEl = document.querySelector('#linked-context-copy');
+const linkedContextFilterCopyEl = document.querySelector('#linked-context-filter-copy');
+const linkedContextFilterControlsEl = document.querySelector('#linked-context-filter-controls');
 const linkedContextResultsEl = document.querySelector('#linked-context-results');
 const linkedContextFormEl = document.querySelector('#linked-context-form');
 const linkedContextSystemEl = document.querySelector('#linked-context-system');
@@ -121,6 +127,7 @@ const state = {
   messageExternalReferences: [],
   linkedContextResults: [],
   linkedContextQuery: null,
+  linkedContextOwnerTypeFilter: 'all',
   relays: [],
   handoffs: [],
   selectedChannelId: null,
@@ -268,9 +275,20 @@ function currentLinkedContextQuery() {
   return state.linkedContextQuery ?? null;
 }
 
+function currentLinkedContextOwnerTypeFilter() {
+  const normalized = normalizeLinkedContextOwnerTypeFilter(state.linkedContextOwnerTypeFilter, state.linkedContextResults);
+  state.linkedContextOwnerTypeFilter = normalized;
+  return normalized;
+}
+
+function setLinkedContextOwnerTypeFilter(filterValue) {
+  state.linkedContextOwnerTypeFilter = normalizeLinkedContextOwnerTypeFilter(filterValue, state.linkedContextResults);
+}
+
 function setLinkedContextQuery(query) {
   if (!query?.system || !query?.externalId) {
     state.linkedContextQuery = null;
+    state.linkedContextOwnerTypeFilter = 'all';
     linkedContextSystemEl.value = externalReferenceSystems[0] ?? '';
     linkedContextExternalIdEl.value = '';
     return;
@@ -281,6 +299,7 @@ function setLinkedContextQuery(query) {
     externalId: query.externalId,
     title: query.title ?? ''
   };
+  state.linkedContextOwnerTypeFilter = 'all';
   linkedContextSystemEl.value = query.system;
   linkedContextExternalIdEl.value = query.externalId;
 }
@@ -1111,41 +1130,59 @@ function linkedContextOwnerMeta(result) {
 
 function renderLinkedContextCards(container, results, emptyText) {
   container.innerHTML = '';
-  if (!results.length) {
+  const groups = groupLinkedContextResults(results, currentLinkedContextOwnerTypeFilter());
+  if (!groups.length) {
     container.innerHTML = `<div class="empty-state">${escapeHtml(emptyText)}</div>`;
     return;
   }
 
-  for (const result of results) {
-    const card = document.createElement('article');
-    card.className = 'reference-card';
-    const selection = buildLinkedContextSelection(result, selectedActor());
-    card.innerHTML = `
-      <div class="reference-card-top">
-        <strong>${escapeHtml(result.owner?.label ?? `${result.reference?.ownerType ?? 'owner'}:${result.reference?.ownerId ?? 'unknown'}`)}</strong>
-        <span class="pill">${escapeHtml(result.reference?.system ?? 'xref')}</span>
+  for (const group of groups) {
+    const section = document.createElement('section');
+    section.className = 'linked-context-group';
+    section.innerHTML = `
+      <div class="linked-context-group-header">
+        <strong>${escapeHtml(group.label)}</strong>
+        <span class="linked-context-group-count">${escapeHtml(`${group.results.length} result${group.results.length === 1 ? '' : 's'}`)}</span>
       </div>
-      <div class="reference-card-meta">${escapeHtml(`${result.reference?.relationType ?? 'relatesTo'} | ${result.reference?.externalId ?? ''}`)}</div>
-      <div class="reference-card-meta">${escapeHtml(linkedContextOwnerMeta(result))}</div>
-      <div class="reference-card-meta">${escapeHtml(summarizeLinkedContextPath(result))}</div>
-      <div class="reference-card-meta">${escapeHtml(summarizeLinkedContextCoordination(result))}</div>
-      ${selection
-        ? '<div class="record-action-row"><button type="button" class="ghost-button linked-context-jump">Open linked context</button></div>'
-        : ''}
-      <div class="reference-card-meta">${escapeHtml(formatTimestamp(result.reference?.createdAt))}</div>
     `;
 
-    if (selection) {
-      card.querySelector('.linked-context-jump')?.addEventListener('click', () => {
-        applySelectionRoute(selection, { announceFailures: true }).then(() => {
-          setStatus(`Opened linked NEXUS context for ${result.reference?.system ?? 'external'}:${result.reference?.externalId ?? ''}.`, 'success');
-        }).catch((error) => {
-          setStatus(error.message, 'error');
+    const list = document.createElement('div');
+    list.className = 'reference-list';
+
+    for (const result of group.results) {
+      const card = document.createElement('article');
+      card.className = 'reference-card';
+      const selection = buildLinkedContextSelection(result, selectedActor());
+      card.innerHTML = `
+        <div class="reference-card-top">
+          <strong>${escapeHtml(result.owner?.label ?? `${result.reference?.ownerType ?? 'owner'}:${result.reference?.ownerId ?? 'unknown'}`)}</strong>
+          <span class="pill">${escapeHtml(result.reference?.system ?? 'xref')}</span>
+        </div>
+        <div class="reference-card-meta">${escapeHtml(`${result.reference?.relationType ?? 'relatesTo'} | ${result.reference?.externalId ?? ''}`)}</div>
+        <div class="reference-card-meta">${escapeHtml(linkedContextOwnerMeta(result))}</div>
+        <div class="reference-card-meta">${escapeHtml(summarizeLinkedContextPath(result))}</div>
+        <div class="reference-card-meta">${escapeHtml(summarizeLinkedContextCoordination(result))}</div>
+        ${selection
+          ? '<div class="record-action-row"><button type="button" class="ghost-button linked-context-jump">Open linked context</button></div>'
+          : ''}
+        <div class="reference-card-meta">${escapeHtml(formatTimestamp(result.reference?.createdAt))}</div>
+      `;
+
+      if (selection) {
+        card.querySelector('.linked-context-jump')?.addEventListener('click', () => {
+          applySelectionRoute(selection, { announceFailures: true }).then(() => {
+            setStatus(`Opened linked NEXUS context for ${result.reference?.system ?? 'external'}:${result.reference?.externalId ?? ''}.`, 'success');
+          }).catch((error) => {
+            setStatus(error.message, 'error');
+          });
         });
-      });
+      }
+
+      list.appendChild(card);
     }
 
-    container.appendChild(card);
+    section.appendChild(list);
+    container.appendChild(section);
   }
 }
 
@@ -1157,6 +1194,39 @@ function clearReferenceComposer() {
 
 function updateLinkedContextComposerState() {
   linkedContextSubmitEl.disabled = !linkedContextSystemEl.value || !linkedContextExternalIdEl.value.trim();
+}
+
+function renderLinkedContextFilterControls() {
+  const query = currentLinkedContextQuery();
+  const activeFilter = currentLinkedContextOwnerTypeFilter();
+  const filterOptions = linkedContextOwnerTypeFilters(state.linkedContextResults)
+    .filter((option) => option.value === 'all' || option.count > 0);
+
+  linkedContextFilterControlsEl.innerHTML = '';
+
+  if (!query) {
+    linkedContextFilterCopyEl.textContent = 'Owner-type grouping and filters unlock after you run a linked-context lookup.';
+  }
+  else {
+    linkedContextFilterCopyEl.textContent = summarizeLinkedContextFilter(state.linkedContextResults, activeFilter);
+  }
+
+  const optionsToRender = filterOptions.length > 0
+    ? filterOptions
+    : [{ value: 'all', label: 'All readable', count: 0 }];
+
+  for (const option of optionsToRender) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `ghost-button linked-context-filter-button${activeFilter === option.value ? ' active' : ''}`;
+    button.textContent = `${option.label} (${option.count})`;
+    button.disabled = !query || option.count === 0;
+    button.addEventListener('click', () => {
+      setLinkedContextOwnerTypeFilter(option.value);
+      renderExternalReferences();
+    });
+    linkedContextFilterControlsEl.appendChild(button);
+  }
 }
 
 function coordinationCountsForMessage(messageId) {
@@ -1657,7 +1727,7 @@ function renderExternalReferences() {
     ? `${actorName(message.authorIdentityId)} | ${state.messageExternalReferences.length} reference${state.messageExternalReferences.length === 1 ? '' : 's'}`
     : 'Select a message to inspect message-level references.';
   linkedContextCopyEl.textContent = linkedQuery
-    ? `${linkedQuery.system.toUpperCase()} ${linkedQuery.externalId} | ${state.linkedContextResults.length} readable linked context${state.linkedContextResults.length === 1 ? '' : 's'}`
+    ? `${linkedQuery.system.toUpperCase()} ${linkedQuery.externalId} | ${state.linkedContextResults.length} readable linked result${state.linkedContextResults.length === 1 ? '' : 's'}`
     : 'Run a read-only reverse lookup to find readable NEXUS context linked to an external item.';
 
   renderReferenceCards(
@@ -1700,6 +1770,7 @@ function renderExternalReferences() {
       }
     }
   );
+  renderLinkedContextFilterControls();
   renderLinkedContextCards(
     linkedContextResultsEl,
     state.linkedContextResults,
@@ -2189,12 +2260,14 @@ async function reloadLinkedContextLookup() {
   const query = currentLinkedContextQuery();
   if (!query) {
     state.linkedContextResults = [];
+    state.linkedContextOwnerTypeFilter = 'all';
     return;
   }
 
   state.linkedContextResults = await getJson(
     `/api/external-reference-links?actorId=${encodeURIComponent(selectedActor())}&system=${encodeURIComponent(query.system)}&externalId=${encodeURIComponent(query.externalId)}`
   );
+  state.linkedContextOwnerTypeFilter = normalizeLinkedContextOwnerTypeFilter(state.linkedContextOwnerTypeFilter, state.linkedContextResults);
 }
 
 async function loadCoordinationRecords() {

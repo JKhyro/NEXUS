@@ -712,6 +712,54 @@ button:disabled {
   gap: 12px;
 }
 
+.linked-context-filter-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.linked-context-filter-copy {
+  line-height: 1.45;
+}
+
+.linked-context-filter-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.linked-context-filter-button.active {
+  background: var(--accent);
+  color: white;
+  border-color: transparent;
+}
+
+.linked-context-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.linked-context-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.linked-context-group-count {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .reference-group-header {
   display: flex;
   flex-direction: column;
