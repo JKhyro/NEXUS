@@ -15,6 +15,15 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function timestampValue(value) {
+  if (!value) {
+    return 0;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function recordTouchesScope(record, scopeType, scopeId) {
   const candidates = [
     [record.scopeType, record.scopeId],
@@ -37,6 +46,10 @@ function recordTouchesScope(record, scopeType, scopeId) {
   return candidates.some(([candidateType, candidateId]) => {
     return candidateType === scopeType && candidateId === scopeId;
   });
+}
+
+function sortByRecentTimestamp(left, right) {
+  return timestampValue(right?.recentAt) - timestampValue(left?.recentAt);
 }
 
 export class BaseNexusStore {
@@ -99,6 +112,138 @@ export class BaseNexusStore {
   listDirectConversations(actorId) {
     return this.metabase.directConversations.filter((directConversation) => {
       return canReadDirectConversation(this.metabase, actorId, directConversation);
+    });
+  }
+
+  listActivity(actorId, workspaceId) {
+    const channels = this.listChannels(actorId, workspaceId);
+    const directConversations = this.listDirectConversations(actorId);
+    const channelIds = new Set(channels.map((channel) => channel.id));
+    const directConversationIds = new Set(directConversations.map((conversation) => conversation.id));
+    const postsById = new Map(this.chatbase.posts.map((post) => [post.id, post]));
+    const channelThreads = new Map();
+    const directMessages = new Map();
+    const channelMessages = new Map();
+
+    for (const thread of this.chatbase.threads) {
+      const parentChannelId = thread.channelId ?? postsById.get(thread.postId ?? '')?.channelId ?? null;
+      if (!parentChannelId || !channelIds.has(parentChannelId)) {
+        continue;
+      }
+
+      const list = channelThreads.get(parentChannelId) ?? [];
+      list.push(thread);
+      channelThreads.set(parentChannelId, list);
+    }
+
+    for (const message of this.chatbase.messages) {
+      if (message.scopeType === 'direct' && directConversationIds.has(message.scopeId)) {
+        const list = directMessages.get(message.scopeId) ?? [];
+        list.push(message);
+        directMessages.set(message.scopeId, list);
+        continue;
+      }
+
+      let channelId = null;
+      if (message.scopeType === 'channel') {
+        channelId = message.scopeId;
+      }
+      else if (message.scopeType === 'post') {
+        channelId = postsById.get(message.scopeId)?.channelId ?? null;
+      }
+      else if (message.scopeType === 'thread') {
+        const thread = this.chatbase.threads.find((entry) => entry.id === message.scopeId);
+        channelId = thread?.channelId ?? postsById.get(thread?.postId ?? '')?.channelId ?? null;
+      }
+
+      if (!channelId || !channelIds.has(channelId)) {
+        continue;
+      }
+
+      const list = channelMessages.get(channelId) ?? [];
+      list.push(message);
+      channelMessages.set(channelId, list);
+    }
+
+    const channelActivity = channels.map((channel) => {
+      const latestMessage = [...(channelMessages.get(channel.id) ?? [])]
+        .sort((left, right) => timestampValue(right.createdAt) - timestampValue(left.createdAt))[0] ?? null;
+      const latestThread = [...(channelThreads.get(channel.id) ?? [])]
+        .sort((left, right) => timestampValue(right.createdAt) - timestampValue(left.createdAt))[0] ?? null;
+
+      let recentAt = latestMessage?.createdAt ?? null;
+      let preview = latestMessage?.body?.trim() || null;
+      let previewAuthorIdentityId = latestMessage?.authorIdentityId ?? null;
+      let messageId = latestMessage?.id ?? null;
+      let postId = null;
+      let threadId = null;
+      let activityKind = latestMessage ? 'message' : 'channel';
+
+      if (latestMessage?.scopeType === 'post') {
+        postId = latestMessage.scopeId;
+      }
+      else if (latestMessage?.scopeType === 'thread') {
+        threadId = latestMessage.scopeId;
+        postId = this.chatbase.threads.find((thread) => thread.id === latestMessage.scopeId)?.postId ?? null;
+      }
+
+      if ((!recentAt || !messageId) && latestThread?.createdAt && timestampValue(latestThread.createdAt) > timestampValue(recentAt)) {
+        recentAt = latestThread.createdAt;
+        preview = `Thread created: ${latestThread.title}`;
+        previewAuthorIdentityId = latestThread.createdByIdentityId;
+        threadId = latestThread.id;
+        postId = latestThread.postId ?? null;
+        messageId = null;
+        activityKind = 'thread-created';
+      }
+
+      return {
+        scopeType: 'channel',
+        scopeId: channel.id,
+        channelId: channel.id,
+        directConversationId: null,
+        label: channel.name,
+        kind: channel.kind,
+        description: channel.description ?? '',
+        recentAt,
+        preview,
+        previewAuthorIdentityId,
+        messageId,
+        postId,
+        threadId,
+        activityKind
+      };
+    });
+
+    const directActivity = directConversations.map((conversation) => {
+      const latestMessage = [...(directMessages.get(conversation.id) ?? [])]
+        .sort((left, right) => timestampValue(right.createdAt) - timestampValue(left.createdAt))[0] ?? null;
+
+      return {
+        scopeType: 'direct',
+        scopeId: conversation.id,
+        channelId: null,
+        directConversationId: conversation.id,
+        label: conversation.id,
+        kind: 'direct',
+        description: '',
+        recentAt: latestMessage?.createdAt ?? conversation.createdAt ?? null,
+        preview: latestMessage?.body?.trim() || (conversation.createdAt ? 'Direct conversation started.' : null),
+        previewAuthorIdentityId: latestMessage?.authorIdentityId ?? conversation.createdByIdentityId ?? null,
+        messageId: latestMessage?.id ?? null,
+        postId: null,
+        threadId: null,
+        activityKind: latestMessage ? 'message' : 'conversation-created'
+      };
+    });
+
+    return [...channelActivity, ...directActivity].filter((entry) => entry.recentAt).sort((left, right) => {
+      const byTime = sortByRecentTimestamp(left, right);
+      if (byTime !== 0) {
+        return byTime;
+      }
+
+      return String(left.label ?? '').localeCompare(String(right.label ?? ''));
     });
   }
 

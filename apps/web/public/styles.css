@@ -165,6 +165,104 @@ textarea {
   opacity: 0.75;
 }
 
+.route-history-toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.route-history-copy {
+  line-height: 1.45;
+}
+
+.route-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.route-history-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.84);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.route-history-entry:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(15, 107, 90, 0.26);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.route-history-entry.active {
+  border-color: rgba(15, 107, 90, 0.34);
+  background: rgba(15, 107, 90, 0.08);
+}
+
+.route-history-entry-label {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.route-history-entry-meta {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.recent-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.84);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.recent-card:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(15, 107, 90, 0.26);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.recent-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.scope-activity-preview {
+  color: var(--ink);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.scope-activity-meta {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .panel-header,
 .subsection-header {
   display: flex;
@@ -329,6 +427,7 @@ button:disabled {
 }
 
 .channel-list,
+.recent-list,
 .direct-list,
 .post-list,
 .thread-list,
@@ -341,6 +440,7 @@ button:disabled {
 }
 
 .channel-list,
+.recent-list,
 .direct-list,
 .post-list,
 .thread-list,
@@ -351,6 +451,7 @@ button:disabled {
 }
 
 .channel-item,
+.recent-card,
 .direct-card,
 .post-card,
 .thread-card,
@@ -361,9 +462,16 @@ button:disabled {
 }
 
 .channel-item,
+.recent-card,
 .direct-card,
 .thread-card {
   background: var(--panel-strong);
+}
+
+.recent-card {
+  width: 100%;
+  padding: 14px 15px;
+  text-align: left;
 }
 
 .channel-item.active,
@@ -375,6 +483,7 @@ button:disabled {
 }
 
 .channel-item-top,
+.recent-card-top,
 .direct-card-top,
 .search-card-top,
 .message-card-top {
@@ -395,6 +504,15 @@ button:disabled {
   word-break: break-word;
 }
 
+.scope-activity-preview {
+  margin-top: 8px;
+  color: var(--ink);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .post-card-title,
 .thread-card-title,
 .message-author {
@@ -404,6 +522,7 @@ button:disabled {
 .post-card-meta,
 .direct-card-meta,
 .thread-card-meta,
+.scope-activity-meta,
 .message-meta,
 .search-card-meta,
 .scope-context span {

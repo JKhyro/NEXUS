@@ -100,6 +100,8 @@ The current desktop/web client can:
 - keep the URL in sync with the current actor, workspace, scope, and selected-message context so operators can deep-link directly back into readable NEXUS state
 - copy a readable link to the current scope or the currently selected message directly from the client surface
 - render clickable breadcrumbs for the current workspace, scope, and selected-message route so operators can step back through readable context without relying only on the sidebar
+- keep a recent readable route-history stack in the client, with in-surface back and forward controls for stepping through recent NEXUS context without leaving the current surface
+- surface recent readable activity across channels and direct conversations so operators can see what changed recently and jump back into the relevant NEXUS route state
 - search visible history and jump into matching channel, post, thread, or direct scopes
 
 For normal local use, copy [config/nexus.local.example.json](config/nexus.local.example.json) to `config/nexus.local.json` and fill in the real LIBRARY connection details. The service and desktop shell will pick that file up automatically.

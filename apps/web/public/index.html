@@ -31,6 +31,11 @@
         </label>
 
         <div class="section-heading">
+          <span class="eyebrow">Recent Activity</span>
+        </div>
+        <div id="recent-activity" class="recent-list"></div>
+
+        <div class="section-heading">
           <span class="eyebrow">Channels</span>
         </div>
         <div id="channels" class="channel-list"></div>
@@ -142,6 +147,12 @@
               <span class="breadcrumb-separator" aria-hidden="true">/</span>
               <span class="breadcrumb-chip breadcrumb-placeholder">Message</span>
             </nav>
+            <div class="route-history-toolbar">
+              <button id="route-back" type="button" class="ghost-button">Back</button>
+              <button id="route-forward" type="button" class="ghost-button">Forward</button>
+            </div>
+            <div id="route-history-copy" class="route-history-copy muted">Recent readable route history will appear here as you navigate.</div>
+            <div id="route-history-list" class="route-history-list"></div>
           </div>
 
           <div class="panel-header">

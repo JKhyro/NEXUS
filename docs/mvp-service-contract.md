@@ -40,6 +40,7 @@ It is intentionally small and internal-first. The contract is designed to power 
 - `GET /api/workspaces?actorId=...`
 - `GET /api/channels?actorId=...&workspaceId=...`
 - `GET /api/direct-conversations?actorId=...`
+- `GET /api/activity?actorId=...&workspaceId=...`
 - `GET /api/posts?actorId=...&channelId=...`
 - `GET /api/threads?actorId=...&channelId=...&postId=...`
 - `GET /api/messages?actorId=...&scopeType=...&scopeId=...`
@@ -79,6 +80,7 @@ It is intentionally small and internal-first. The contract is designed to power 
 - `GET /api/external-references` and `POST /api/external-references` must work uniformly for scope owners (`channel`, `post`, `thread`, `direct`) and message owners so desktop and future web clients do not fork their reference model.
 - `GET /api/message` must enforce the same scope visibility checks as `GET /api/messages`, so message-linked coordination jumps do not bypass access policy.
 - `GET /api/relays` and `GET /api/handoffs` must filter by the selected readable scope so cutover diagnostics stay on the shared contract and do not require direct store inspection.
+- `GET /api/activity` must summarize only readable channel and direct-conversation activity for the requested actor and workspace, so recent navigation never becomes an access-policy bypass.
 - `POST /api/relays` and `POST /api/handoffs` must enforce the same scope policy as the rest of the service so coordination records do not bypass METABASE-backed visibility or write rules.
 - Relay and handoff records may carry `messageId` links so the client can jump back into the related conversation context without inventing a second activity model.
 - `POST /api/adapters/discord/events` must persist a relay record for every accepted Discord ingress event so cutover diagnostics survive service restarts and importer reruns.

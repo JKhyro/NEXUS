@@ -9,10 +9,19 @@ import {
   deriveBreadcrumbRoute,
   parseSelectionRouteHash
 } from './selection-route.mjs';
+import {
+  canStepRouteHistory,
+  createRouteHistoryState,
+  pushRouteHistory,
+  recentRouteHistory,
+  selectRouteHistoryIndex,
+  stepRouteHistory
+} from './route-history.mjs';
 
 const actorSelect = document.querySelector('#actor');
 const workspaceSelect = document.querySelector('#workspace');
 const channelsEl = document.querySelector('#channels');
+const recentActivityEl = document.querySelector('#recent-activity');
 const directConversationsEl = document.querySelector('#direct-conversations');
 const directComposerEl = document.querySelector('#direct-composer');
 const directMembersEl = document.querySelector('#direct-members');
@@ -47,6 +56,10 @@ const searchResultsEl = document.querySelector('#search-results');
 const scopeSummaryEl = document.querySelector('#scope-summary');
 const breadcrumbCardCopyEl = document.querySelector('#breadcrumb-card-copy');
 const routeBreadcrumbsEl = document.querySelector('#route-breadcrumbs');
+const routeBackEl = document.querySelector('#route-back');
+const routeForwardEl = document.querySelector('#route-forward');
+const routeHistoryCopyEl = document.querySelector('#route-history-copy');
+const routeHistoryListEl = document.querySelector('#route-history-list');
 const copyScopeLinkEl = document.querySelector('#copy-scope-link');
 const copyMessageLinkEl = document.querySelector('#copy-message-link');
 const linkActionCopyEl = document.querySelector('#link-action-copy');
@@ -86,6 +99,7 @@ const state = {
   identities: [],
   identityMap: new Map(),
   channels: [],
+  recentActivity: [],
   directConversations: [],
   postsByChannelId: new Map(),
   postChannelIndex: new Map(),
@@ -103,7 +117,9 @@ const state = {
   selectedMessageId: null,
   coordinationFocusMode: 'scope',
   selectedScope: null,
-  health: null
+  health: null,
+  routeHistory: createRouteHistoryState(12),
+  routeHistorySuspended: false
 };
 
 let routeSyncSuspended = true;
@@ -272,6 +288,80 @@ function currentScopeLabel() {
   return channel.name;
 }
 
+function activityTimestampValue(value) {
+  if (!value) {
+    return 0;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function activityForScope(scopeType, scopeId) {
+  return state.recentActivity.find((entry) => entry.scopeType === scopeType && entry.scopeId === scopeId) ?? null;
+}
+
+function activityForChannel(channelId) {
+  return activityForScope('channel', channelId);
+}
+
+function activityForDirectConversation(directConversationId) {
+  return activityForScope('direct', directConversationId);
+}
+
+function compareActivitySummaries(left, right) {
+  const byTime = activityTimestampValue(right?.recentAt) - activityTimestampValue(left?.recentAt);
+  if (byTime !== 0) {
+    return byTime;
+  }
+
+  return String(left?.label ?? '').localeCompare(String(right?.label ?? ''));
+}
+
+function activityLabel(entry) {
+  if (!entry) {
+    return 'Unknown activity';
+  }
+
+  if (entry.scopeType === 'direct') {
+    const conversation = state.directConversations.find((candidate) => candidate.id === entry.directConversationId);
+    return conversation ? directConversationLabel(conversation) : 'Direct conversation';
+  }
+
+  return entry.label ?? entry.scopeId;
+}
+
+function summarizeActivityPreview(entry) {
+  if (!entry) {
+    return 'No recent activity yet.';
+  }
+
+  if (entry.preview) {
+    return entry.preview;
+  }
+
+  if (entry.scopeType === 'direct') {
+    return 'Direct conversation started but no messages are visible yet.';
+  }
+
+  return 'No recent activity has been captured for this lane yet.';
+}
+
+function summarizeActivityMeta(entry) {
+  if (!entry?.recentAt) {
+    return 'No recent activity yet';
+  }
+
+  const parts = [formatTimestamp(entry.recentAt)];
+  if (entry.previewAuthorIdentityId) {
+    parts.unshift(actorName(entry.previewAuthorIdentityId));
+  }
+  if (entry.activityKind && entry.activityKind !== 'message') {
+    parts.push(entry.activityKind.replaceAll('-', ' '));
+  }
+  return parts.join(' | ');
+}
+
 function setStatus(message, tone = 'info') {
   if (!message) {
     statusEl.className = 'status hidden';
@@ -394,6 +484,127 @@ function renderBreadcrumbs() {
   routeBreadcrumbsEl.innerHTML = renderBreadcrumbTrail();
 }
 
+function currentRouteHistoryLabel() {
+  const message = currentMessage();
+  const thread = currentThread();
+  const post = currentPost();
+  const directConversation = currentDirectConversation();
+  const channel = currentChannel();
+
+  if (message) {
+    return `Message · ${actorName(message.authorIdentityId)} · ${currentScopeLabel()}`;
+  }
+
+  if (thread) {
+    return `Thread · ${thread.title}`;
+  }
+
+  if (post) {
+    return `Post · ${post.title}`;
+  }
+
+  if (directConversation) {
+    return `Direct · ${directConversationLabel(directConversation)}`;
+  }
+
+  if (channel) {
+    return `Channel · ${channel.name}`;
+  }
+
+  return `Workspace · ${currentWorkspaceLabel()}`;
+}
+
+function currentRouteHistoryEntry() {
+  return {
+    hash: currentSelectionRouteHash(),
+    label: currentRouteHistoryLabel(),
+    detail: `${actorName(selectedActor())} · ${currentWorkspaceLabel()}`,
+    visitedAt: new Date().toISOString()
+  };
+}
+
+function recordCurrentRouteHistory() {
+  if (state.routeHistorySuspended) {
+    return;
+  }
+
+  const next = recordRouteHistory(
+    state.routeHistoryEntries,
+    state.routeHistoryIndex,
+    currentRouteHistoryEntry()
+  );
+
+  state.routeHistoryEntries = next.entries;
+  state.routeHistoryIndex = next.index;
+}
+
+function renderRouteHistory() {
+  const currentEntry = state.routeHistoryEntries[state.routeHistoryIndex] ?? null;
+
+  routeBackEl.disabled = state.routeHistoryIndex <= 0;
+  routeForwardEl.disabled = state.routeHistoryIndex < 0 || state.routeHistoryIndex >= state.routeHistoryEntries.length - 1;
+
+  if (!currentEntry) {
+    routeHistoryCopyEl.textContent = 'Recent readable route history will appear here as you navigate.';
+    routeHistoryListEl.innerHTML = '<div class="muted">No recent route history yet.</div>';
+    return;
+  }
+
+  routeHistoryCopyEl.textContent = 'Use back and forward to step through recent readable route context without leaving NEXUS.';
+
+  const visibleEntries = recentRouteHistory({
+    entries: state.routeHistoryEntries,
+    index: state.routeHistoryIndex
+  }, 6);
+  routeHistoryListEl.innerHTML = visibleEntries.map((entry) => {
+    const actualIndex = entry.index;
+    const active = entry.isCurrent;
+    return `
+      <button type="button" class="route-history-entry${active ? ' active' : ''}" data-route-history-index="${actualIndex}">
+        <span class="route-history-entry-label">${escapeHtml(entry.label)}</span>
+        <span class="route-history-entry-meta">${escapeHtml(`${entry.detail} · ${formatTimestamp(entry.visitedAt)}`)}</span>
+      </button>
+    `;
+  }).join('');
+}
+
+async function navigateRouteHistory(direction) {
+  const next = stepRouteHistory(state.routeHistoryEntries, state.routeHistoryIndex, direction);
+  if (!next.entry) {
+    return;
+  }
+
+  state.routeHistoryIndex = next.index;
+  state.routeHistorySuspended = true;
+  try {
+    await applySelectionRoute(parseSelectionRouteHash(next.entry.hash), { announceFailures: true });
+  }
+  finally {
+    state.routeHistorySuspended = false;
+    renderRouteHistory();
+  }
+}
+
+async function navigateRouteHistoryIndex(index) {
+  const next = selectRouteHistoryIndex({
+    entries: state.routeHistoryEntries,
+    index: state.routeHistoryIndex
+  }, index);
+  if (!next.entry) {
+    return;
+  }
+
+  state.routeHistoryIndex = next.history.index;
+  state.routeHistorySuspended = true;
+  try {
+    await applySelectionRoute(parseSelectionRouteHash(next.entry.hash), { announceFailures: true });
+  }
+  finally {
+    state.routeHistorySuspended = false;
+    renderRouteHistory();
+  }
+}
+
 async function navigateBreadcrumb(level) {
   if (level === 'workspace') {
     state.selectedDirectConversationId = null;
@@ -466,13 +677,13 @@ function syncSelectionRoute() {
   }
 
   const nextHash = currentSelectionRouteHash();
-  if (window.location.hash === nextHash) {
-    return;
+  if (window.location.hash !== nextHash) {
+    const url = new URL(window.location.href);
+    url.hash = nextHash.startsWith('#') ? nextHash.slice(1) : nextHash;
+    history.replaceState(null, '', url);
   }
 
-  const url = new URL(window.location.href);
-  url.hash = nextHash.startsWith('#') ? nextHash.slice(1) : nextHash;
-  history.replaceState(null, '', url);
+  recordCurrentRouteHistory();
 }
 
 function renderLinkActions() {
@@ -974,6 +1185,38 @@ async function navigateToMessage(messageId) {
   renderAll();
 }
 
+async function navigateToActivitySummary(entry) {
+  if (!entry) {
+    return;
+  }
+
+  if (entry.messageId) {
+    await navigateToMessage(entry.messageId);
+    return;
+  }
+
+  if (entry.scopeType === 'direct' && entry.directConversationId) {
+    state.selectedDirectConversationId = entry.directConversationId;
+    state.selectedChannelId = null;
+    state.selectedPostId = null;
+    state.selectedThreadId = null;
+    state.selectedMessageId = null;
+    state.coordinationFocusMode = 'scope';
+    await syncSelection();
+    return;
+  }
+
+  if (entry.channelId) {
+    state.selectedDirectConversationId = null;
+    state.selectedChannelId = entry.channelId;
+    state.selectedPostId = entry.postId ?? null;
+    state.selectedThreadId = entry.threadId ?? null;
+    state.selectedMessageId = null;
+    state.coordinationFocusMode = 'scope';
+    await syncSelection();
+  }
+}
+
 function renderRecordCards(container, records, type, emptyText) {
   container.innerHTML = '';
   if (!records.length) {
@@ -1042,6 +1285,36 @@ function renderHealth() {
   healthEl.textContent = JSON.stringify(state.health ?? {}, null, 2);
 }
 
+function renderRecentActivity() {
+  recentActivityEl.innerHTML = '';
+  const recent = state.recentActivity.filter((entry) => entry.recentAt).slice(0, 8);
+
+  if (recent.length === 0) {
+    recentActivityEl.innerHTML = '<div class="empty-state">No recent readable activity yet.</div>';
+    return;
+  }
+
+  for (const entry of recent) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'recent-card';
+    button.innerHTML = `
+      <div class="recent-card-top">
+        <strong>${escapeHtml(activityLabel(entry))}</strong>
+        <span class="pill">${escapeHtml(entry.kind)}</span>
+      </div>
+      <div class="scope-activity-preview">${escapeHtml(summarizeActivityPreview(entry))}</div>
+      <div class="scope-activity-meta">${escapeHtml(summarizeActivityMeta(entry))}</div>
+    `;
+    button.addEventListener('click', () => {
+      navigateToActivitySummary(entry).catch((error) => {
+        setStatus(error.message, 'error');
+      });
+    });
+    recentActivityEl.appendChild(button);
+  }
+}
+
 function renderScopeShell() {
   const showForum = Boolean(currentChannel()?.kind === 'forum');
   const showThreads = Boolean(!currentDirectConversation() && currentThreadParent());
@@ -1054,7 +1327,12 @@ function renderScopeShell() {
 
 function renderChannels() {
   channelsEl.innerHTML = '';
-  for (const channel of state.channels) {
+  const channels = [...state.channels].sort((left, right) => {
+    return compareActivitySummaries(activityForChannel(left.id) ?? { label: left.name }, activityForChannel(right.id) ?? { label: right.name });
+  });
+
+  for (const channel of channels) {
+    const activity = activityForChannel(channel.id);
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `channel-item${state.selectedChannelId === channel.id && !state.selectedDirectConversationId ? ' active' : ''}`;
@@ -1064,6 +1342,8 @@ function renderChannels() {
         <span class="pill">${escapeHtml(channel.kind)}</span>
       </div>
       <div class="channel-item-copy">${escapeHtml(channel.description ?? '')}</div>
+      <div class="scope-activity-preview">${escapeHtml(summarizeActivityPreview(activity))}</div>
+      <div class="scope-activity-meta">${escapeHtml(summarizeActivityMeta(activity))}</div>
     `;
     button.addEventListener('click', async () => {
       state.selectedDirectConversationId = null;
@@ -1095,7 +1375,15 @@ function renderDirectComposerOptions() {
 
 function renderDirectConversations() {
   directConversationsEl.innerHTML = '';
-  for (const conversation of state.directConversations) {
+  const conversations = [...state.directConversations].sort((left, right) => {
+    return compareActivitySummaries(
+      activityForDirectConversation(left.id) ?? { label: directConversationLabel(left) },
+      activityForDirectConversation(right.id) ?? { label: directConversationLabel(right) }
+    );
+  });
+
+  for (const conversation of conversations) {
+    const activity = activityForDirectConversation(conversation.id);
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `direct-card${state.selectedDirectConversationId === conversation.id ? ' active' : ''}`;
@@ -1105,7 +1393,8 @@ function renderDirectConversations() {
         <span class="pill">direct</span>
       </div>
       <div class="direct-card-copy">${escapeHtml(directConversationMembers(conversation))}</div>
-      <div class="direct-card-meta">${escapeHtml(formatTimestamp(conversation.createdAt))}</div>
+      <div class="scope-activity-preview">${escapeHtml(summarizeActivityPreview(activity))}</div>
+      <div class="direct-card-meta">${escapeHtml(summarizeActivityMeta(activity) || formatTimestamp(conversation.createdAt))}</div>
     `;
     button.addEventListener('click', async () => {
       state.selectedDirectConversationId = conversation.id;
@@ -1456,6 +1745,30 @@ routeBreadcrumbsEl.addEventListener('click', (event) => {
   });
 });
 
+routeBackEl.addEventListener('click', () => {
+  navigateRouteHistory(-1).catch((error) => {
+    setStatus(error.message, 'error');
+  });
+});
+
+routeForwardEl.addEventListener('click', () => {
+  navigateRouteHistory(1).catch((error) => {
+    setStatus(error.message, 'error');
+  });
+});
+
+routeHistoryListEl.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-route-history-index]');
+  if (!button || button.disabled) {
+    return;
+  }
+
+  event.preventDefault();
+  navigateRouteHistoryIndex(Number(button.dataset.routeHistoryIndex)).catch((error) => {
+    setStatus(error.message, 'error');
+  });
+});
+
 function updateComposerState() {
   const directConversation = currentDirectConversation();
   const channel = currentChannel();
@@ -1608,6 +1921,17 @@ async function loadDirectConversations() {
   }
 }
 
+async function loadRecentActivity() {
+  if (!selectedWorkspace()) {
+    state.recentActivity = [];
+    return;
+  }
+
+  state.recentActivity = await getJson(
+    `/api/activity?actorId=${encodeURIComponent(selectedActor())}&workspaceId=${encodeURIComponent(selectedWorkspace())}`
+  );
+}
+
 async function hydrateForumIndex() {
   state.postsByChannelId.clear();
   state.postChannelIndex.clear();
@@ -1721,6 +2045,7 @@ async function loadCoordinationRecords() {
 
 function renderAll() {
   renderScopeShell();
+  renderRecentActivity();
   renderChannels();
   renderDirectConversations();
   renderPosts();
@@ -1729,6 +2054,7 @@ function renderAll() {
   renderExternalReferences();
   renderCoordinationRecords();
   renderBreadcrumbs();
+  renderRouteHistory();
   renderScopeHeader();
   renderScopeSummary();
   renderLinkActions();
@@ -1860,6 +2186,7 @@ async function syncSelection() {
     }
     await loadExternalReferences();
     await loadCoordinationRecords();
+    await loadRecentActivity();
     renderAll();
     return;
   }
@@ -1871,6 +2198,7 @@ async function syncSelection() {
     state.selectedMessageId = null;
     await loadExternalReferences();
     await loadCoordinationRecords();
+    await loadRecentActivity();
     renderAll();
     return;
   }
@@ -1936,6 +2264,7 @@ async function syncSelection() {
   }
   await loadExternalReferences();
   await loadCoordinationRecords();
+  await loadRecentActivity();
   renderAll();
 }
 

@@ -123,6 +123,13 @@ async function routeApi(request, response, store, config) {
     return sendJson(request, response, config, 200, store.listDirectConversations(actorId));
   }
 
+  if (request.method === 'GET' && url.pathname === '/api/activity') {
+    return sendJson(request, response, config, 200, store.listActivity(
+      actorId,
+      url.searchParams.get('workspaceId')
+    ));
+  }
+
   if (request.method === 'GET' && url.pathname === '/api/posts') {
     return sendJson(request, response, config, 200, store.listPosts(actorId, url.searchParams.get('channelId')));
   }

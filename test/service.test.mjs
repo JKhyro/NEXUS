@@ -39,6 +39,57 @@ test('service boots and exposes the seeded internal channel map', async () => {
   });
 });
 
+test('activity endpoint summarizes recent readable channel and direct changes', async () => {
+  await withService(async (service) => {
+    await fetch(`${service.url}/api/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        scopeType: 'channel',
+        scopeId: 'channel-workflow',
+        body: 'Workflow activity snapshot'
+      })
+    });
+
+    const directConversation = await fetch(`${service.url}/api/direct-conversations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        memberIdentityIds: ['identity-jack', 'identity-kira']
+      })
+    }).then((response) => response.json());
+
+    await fetch(`${service.url}/api/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-kira',
+        scopeType: 'direct',
+        scopeId: directConversation.id,
+        body: 'Direct activity snapshot'
+      })
+    });
+
+    const activity = await fetch(
+      `${service.url}/api/activity?actorId=identity-jack&workspaceId=workspace-internal-core`
+    ).then((response) => response.json());
+
+    const workflow = activity.find((entry) => entry.scopeType === 'channel' && entry.scopeId === 'channel-workflow');
+    const direct = activity.find((entry) => entry.scopeType === 'direct' && entry.scopeId === directConversation.id);
+
+    assert(workflow);
+    assert.equal(workflow.preview, 'Workflow activity snapshot');
+    assert.equal(workflow.activityKind, 'message');
+
+    assert(direct);
+    assert.equal(direct.preview, 'Direct activity snapshot');
+    assert.equal(direct.activityKind, 'message');
+    assert.equal(direct.directConversationId, directConversation.id);
+  });
+});
+
 test('messages persist across service restarts', async () => {
   const dataDir = await mkdtemp(join(tmpdir(), 'nexus-'));
 
@@ -470,6 +521,87 @@ test('direct conversations can be created, listed, and messaged through the shar
 
     assert(conversations.some((conversation) => conversation.id === created.id));
     assert(messages.some((message) => message.body === 'Direct conversation test message'));
+  });
+});
+
+test('activity endpoint summarizes recent readable channel and direct activity', async () => {
+  await withService(async (service) => {
+    const directConversation = await fetch(`${service.url}/api/direct-conversations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        memberIdentityIds: ['identity-jack', 'identity-kira']
+      })
+    }).then((response) => response.json());
+
+    const post = await fetch(`${service.url}/api/posts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        channelId: 'channel-report',
+        title: 'Recent report post',
+        body: 'Opening report message'
+      })
+    }).then((response) => response.json());
+
+    const thread = await fetch(`${service.url}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        postId: post.post.id,
+        title: 'Recent report thread'
+      })
+    }).then((response) => response.json());
+
+    await fetch(`${service.url}/api/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-kira',
+        scopeType: 'direct',
+        scopeId: directConversation.id,
+        body: 'Direct recent activity'
+      })
+    });
+
+    const threadMessage = await fetch(`${service.url}/api/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        scopeType: 'thread',
+        scopeId: thread.id,
+        body: 'Thread recent activity'
+      })
+    }).then((response) => response.json());
+
+    await fetch(`${service.url}/api/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        scopeType: 'channel',
+        scopeId: 'channel-workflow',
+        body: 'Workflow recent activity'
+      })
+    });
+
+    const activity = await fetch(`${service.url}/api/activity?actorId=identity-jack&workspaceId=workspace-internal-core`).then((response) => response.json());
+    const reportActivity = activity.find((entry) => entry.scopeType === 'channel' && entry.scopeId === 'channel-report');
+    const directActivity = activity.find((entry) => entry.scopeType === 'direct' && entry.scopeId === directConversation.id);
+    const heraPrivate = activity.find((entry) => entry.scopeType === 'channel' && entry.scopeId === 'channel-hera');
+
+    assert(reportActivity);
+    assert.equal(reportActivity.threadId, thread.id);
+    assert.equal(reportActivity.messageId, threadMessage.message.id);
+    assert.equal(reportActivity.preview, 'Thread recent activity');
+    assert(directActivity);
+    assert.equal(directActivity.directConversationId, directConversation.id);
+    assert.equal(directActivity.preview, 'Direct recent activity');
+    assert.equal(heraPrivate, undefined);
   });
 });
 
