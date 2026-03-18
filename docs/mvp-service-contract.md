@@ -49,6 +49,7 @@ It is intentionally small and internal-first. The contract is designed to power 
 - `GET /api/handoffs?actorId=...&scopeType=...&scopeId=...`
 - `GET /api/search?actorId=...&q=...`
 - `GET /api/external-references?actorId=...&ownerType=...&ownerId=...`
+- `GET /api/external-reference-links?actorId=...&system=...&externalId=...`
 
 ### Write
 
@@ -78,6 +79,10 @@ It is intentionally small and internal-first. The contract is designed to power 
 - `GET /api/health` must also expose `deploymentMode`, `staticMode`, and any safe origin metadata needed to tell whether the service is running as a desktop-managed local surface or a hosted-capable/API-only surface.
 - `POST /api/messages` and `POST /api/posts` may carry inline `attachments` arrays so composition stays on the shared message contract instead of depending on a separate upload/session model in the MVP.
 - `GET /api/external-references` and `POST /api/external-references` must work uniformly for scope owners (`channel`, `post`, `thread`, `direct`) and message owners so desktop and future web clients do not fork their reference model.
+- `GET /api/external-reference-links` must return every readable NEXUS owner or message currently linked to the requested external item, filtered by the requesting actor's normal visibility rules.
+- Reverse linked-context results must include enough route metadata to reopen the linked NEXUS context without a second model, including any readable workspace, scope, post, thread, direct-conversation, and message identifiers needed by the client.
+- Reverse linked-context lookup is read-only. It does not create workflow objects or redefine the external reference owner model.
+- Records without read access must be omitted rather than partially disclosed.
 - `GET /api/message` must enforce the same scope visibility checks as `GET /api/messages`, so message-linked coordination jumps do not bypass access policy.
 - `GET /api/relays` and `GET /api/handoffs` must filter by the selected readable scope so cutover diagnostics stay on the shared contract and do not require direct store inspection.
 - `GET /api/activity` must summarize only readable channel and direct-conversation activity for the requested actor and workspace, so recent navigation never becomes an access-policy bypass.
@@ -86,7 +91,7 @@ It is intentionally small and internal-first. The contract is designed to power 
 - `POST /api/adapters/discord/events` must persist a relay record for every accepted Discord ingress event so cutover diagnostics survive service restarts and importer reruns.
 - `POST /api/adapters/discord/events` may also carry an optional `handoff` object with `toIdentityId`, `rationale`, and optional `fromIdentityId`; when present, the service must persist a handoff record in the mapped NEXUS scope alongside the ingested message.
 - Adapter payloads may contain external transport identifiers but must map into internal NEXUS objects before persistence.
-- External references never redefine the owning object; they only link outward.
+- External references never redefine the owning object; they link outward and may also be used for reverse lookup into readable linked NEXUS context.
 - All persisted messages generate message events in CHATBASE.
 - Attachments are first-class metadata records attached to messages.
 

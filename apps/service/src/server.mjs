@@ -184,6 +184,14 @@ async function routeApi(request, response, store, config) {
     ));
   }
 
+  if (request.method === 'GET' && url.pathname === '/api/external-reference-links') {
+    return sendJson(request, response, config, 200, store.listExternalReferenceLinks(
+      actorId,
+      url.searchParams.get('system'),
+      url.searchParams.get('externalId')
+    ));
+  }
+
   if (request.method === 'POST' && url.pathname === '/api/messages') {
     return sendJson(request, response, config, 201, await store.createMessage(await readBody(request)));
   }

@@ -14,6 +14,11 @@ ANVIL owns workflow, project, and execution objects.
 
 The bridge between them in the MVP is the `externalReference` model.
 
+That model serves two purposes:
+
+- outward attachment from a NEXUS owner or message to an external item
+- reverse lookup back into readable NEXUS context by `system + externalId`
+
 ## External reference object
 
 An external reference includes:
@@ -33,7 +38,7 @@ An external reference includes:
 
 - workspace
 - channel
-- directConversation
+- direct
 - post
 - thread
 - message
@@ -60,4 +65,6 @@ An external reference includes:
 - NEXUS may attach an external reference to conversation objects now.
 - NEXUS does not create or own ANVIL tasks in this MVP.
 - NEXUS must be able to list and retrieve external references for any readable object.
+- NEXUS must be able to retrieve readable linked conversation context by external item identity (`system + externalId`), not only list references from a known NEXUS owner.
+- Reverse linked-context results must respect NEXUS access policy and return only readable conversations, scopes, and messages.
 - Future ANVIL integration should reuse the same reference model rather than replace it.

@@ -52,6 +52,21 @@ function sortByRecentTimestamp(left, right) {
   return timestampValue(right?.recentAt) - timestampValue(left?.recentAt);
 }
 
+function summarizePreview(value, limit = 96) {
+  const text = String(value ?? '').trim();
+  if (!text) {
+    return 'Empty message';
+  }
+  if (text.length <= limit) {
+    return text;
+  }
+  return `${text.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
+}
+
+function isSkippableLinkedContextError(error) {
+  return /not allowed|not found|missing/i.test(String(error?.message ?? ''));
+}
+
 export class BaseNexusStore {
   constructor() {
     this.metabase = null;
@@ -379,6 +394,28 @@ export class BaseNexusStore {
     });
   }
 
+  listExternalReferenceLinks(actorId, system, externalId) {
+    const normalizedActorId = String(actorId ?? '').trim();
+    const normalizedSystem = String(system ?? '').trim();
+    const normalizedExternalId = String(externalId ?? '').trim();
+
+    if (!normalizedActorId) {
+      throw new Error('actorId is required for reverse external reference lookup.');
+    }
+    if (!normalizedSystem) {
+      throw new Error('system is required for reverse external reference lookup.');
+    }
+    if (!normalizedExternalId) {
+      throw new Error('externalId is required for reverse external reference lookup.');
+    }
+
+    return this.metabase.externalReferences
+      .filter((reference) => reference.system === normalizedSystem && reference.externalId === normalizedExternalId)
+      .map((reference) => this.resolveExternalReferenceLink(normalizedActorId, reference))
+      .filter(Boolean)
+      .sort((left, right) => timestampValue(right.reference?.createdAt) - timestampValue(left.reference?.createdAt));
+  }
+
   searchMessages(actorId, query) {
     const lower = query.trim().toLowerCase();
     const messages = this.chatbase.messages.filter((message) => {
@@ -542,6 +579,210 @@ export class BaseNexusStore {
     this.metabase.externalReferences.push(externalReference);
     await this.saveMetabase();
     return externalReference;
+  }
+
+  resolveExternalReferenceLink(actorId, reference) {
+    try {
+      const resolved = this.resolveExternalReferenceOwner(actorId, reference.ownerType, reference.ownerId);
+      if (!resolved) {
+        return null;
+      }
+
+      return {
+        reference: {
+          id: reference.id,
+          ownerType: reference.ownerType,
+          ownerId: reference.ownerId,
+          system: reference.system,
+          relationType: reference.relationType,
+          externalId: reference.externalId,
+          url: reference.url,
+          title: reference.title,
+          createdByIdentityId: reference.createdByIdentityId,
+          createdAt: reference.createdAt
+        },
+        owner: {
+          ownerType: reference.ownerType,
+          ownerId: reference.ownerId,
+          label: resolved.label
+        },
+        route: resolved.route
+      };
+    }
+    catch (error) {
+      if (isSkippableLinkedContextError(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  resolveExternalReferenceOwner(actorId, ownerType, ownerId) {
+    if (ownerType === 'message') {
+      const message = this.chatbase.messages.find((entry) => entry.id === ownerId);
+      if (!message) {
+        throw new Error('Message not found for reverse external reference lookup.');
+      }
+
+      const route = this.buildReadableRoute(actorId, message.scopeType, message.scopeId, { messageId: message.id });
+      return {
+        label: `Message: ${summarizePreview(message.body)}`,
+        route
+      };
+    }
+
+    if (ownerType === 'channel') {
+      const channel = this.metabase.channels.find((entry) => entry.id === ownerId);
+      if (!channel) {
+        throw new Error('Channel not found for reverse external reference lookup.');
+      }
+
+      return {
+        label: `Channel: ${channel.name}`,
+        route: this.buildReadableRoute(actorId, 'channel', channel.id)
+      };
+    }
+
+    if (ownerType === 'post') {
+      const post = this.chatbase.posts.find((entry) => entry.id === ownerId);
+      if (!post) {
+        throw new Error('Post not found for reverse external reference lookup.');
+      }
+
+      return {
+        label: `Post: ${post.title}`,
+        route: this.buildReadableRoute(actorId, 'post', post.id)
+      };
+    }
+
+    if (ownerType === 'thread') {
+      const thread = this.chatbase.threads.find((entry) => entry.id === ownerId);
+      if (!thread) {
+        throw new Error('Thread not found for reverse external reference lookup.');
+      }
+
+      return {
+        label: `Thread: ${thread.title}`,
+        route: this.buildReadableRoute(actorId, 'thread', thread.id)
+      };
+    }
+
+    if (ownerType === 'direct') {
+      const directConversation = this.metabase.directConversations.find((entry) => entry.id === ownerId);
+      if (!directConversation) {
+        throw new Error('Direct conversation not found for reverse external reference lookup.');
+      }
+
+      const memberNames = directConversation.memberIdentityIds.map((identityId) => {
+        return this.getIdentity(identityId)?.displayName ?? identityId;
+      }).join(', ');
+
+      return {
+        label: `Direct: ${memberNames}`,
+        route: this.buildReadableRoute(actorId, 'direct', directConversation.id)
+      };
+    }
+
+    throw new Error(`Unsupported external reference owner type: ${ownerType}`);
+  }
+
+  buildReadableRoute(actorId, scopeType, scopeId, options = {}) {
+    const messageId = options.messageId ?? null;
+    assertReadableScope(this, actorId, scopeType, scopeId);
+
+    if (scopeType === 'direct') {
+      const directConversation = this.metabase.directConversations.find((entry) => entry.id === scopeId);
+      if (!directConversation) {
+        throw new Error('Direct conversation not found for linked-context route resolution.');
+      }
+
+      return {
+        workspaceId: null,
+        channelId: null,
+        directConversationId: directConversation.id,
+        postId: null,
+        threadId: null,
+        messageId,
+        scopeType: 'direct',
+        scopeId: directConversation.id
+      };
+    }
+
+    if (scopeType === 'channel') {
+      const channel = this.metabase.channels.find((entry) => entry.id === scopeId);
+      if (!channel) {
+        throw new Error('Channel not found for linked-context route resolution.');
+      }
+
+      return {
+        workspaceId: channel.workspaceId,
+        channelId: channel.id,
+        directConversationId: null,
+        postId: null,
+        threadId: null,
+        messageId,
+        scopeType: 'channel',
+        scopeId: channel.id
+      };
+    }
+
+    if (scopeType === 'post') {
+      const post = this.chatbase.posts.find((entry) => entry.id === scopeId);
+      if (!post) {
+        throw new Error('Post not found for linked-context route resolution.');
+      }
+
+      const channel = this.metabase.channels.find((entry) => entry.id === post.channelId);
+      if (!channel) {
+        throw new Error('Parent channel not found for linked-context post resolution.');
+      }
+
+      return {
+        workspaceId: channel.workspaceId,
+        channelId: channel.id,
+        directConversationId: null,
+        postId: post.id,
+        threadId: null,
+        messageId,
+        scopeType: 'post',
+        scopeId: post.id
+      };
+    }
+
+    if (scopeType === 'thread') {
+      const thread = this.chatbase.threads.find((entry) => entry.id === scopeId);
+      if (!thread) {
+        throw new Error('Thread not found for linked-context route resolution.');
+      }
+
+      let channelId = thread.channelId ?? null;
+      let postId = thread.postId ?? null;
+      if (!channelId && postId) {
+        const post = this.chatbase.posts.find((entry) => entry.id === postId);
+        channelId = post?.channelId ?? null;
+      }
+      if (!channelId) {
+        throw new Error('Parent channel not found for linked-context thread resolution.');
+      }
+
+      const channel = this.metabase.channels.find((entry) => entry.id === channelId);
+      if (!channel) {
+        throw new Error('Channel not found for linked-context thread resolution.');
+      }
+
+      return {
+        workspaceId: channel.workspaceId,
+        channelId: channel.id,
+        directConversationId: null,
+        postId,
+        threadId: thread.id,
+        messageId,
+        scopeType: 'thread',
+        scopeId: thread.id
+      };
+    }
+
+    throw new Error(`Unsupported scope type for linked-context route resolution: ${scopeType}`);
   }
 
   async ingestDiscordEvent(input) {

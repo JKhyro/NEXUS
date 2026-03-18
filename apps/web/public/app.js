@@ -10,6 +10,10 @@ import {
   parseSelectionRouteHash
 } from './selection-route.mjs';
 import {
+  buildLinkedContextSelection,
+  summarizeLinkedContextPath
+} from './linked-context.mjs';
+import {
   canStepRouteHistory,
   createRouteHistoryState,
   pushRouteHistory,
@@ -67,6 +71,12 @@ const scopeReferenceCopyEl = document.querySelector('#scope-reference-copy');
 const scopeReferencesEl = document.querySelector('#scope-references');
 const messageReferenceCopyEl = document.querySelector('#message-reference-copy');
 const messageReferencesEl = document.querySelector('#message-references');
+const linkedContextCopyEl = document.querySelector('#linked-context-copy');
+const linkedContextResultsEl = document.querySelector('#linked-context-results');
+const linkedContextFormEl = document.querySelector('#linked-context-form');
+const linkedContextSystemEl = document.querySelector('#linked-context-system');
+const linkedContextExternalIdEl = document.querySelector('#linked-context-external-id');
+const linkedContextSubmitEl = document.querySelector('#linked-context-submit');
 const coordinationFocusCopyEl = document.querySelector('#coordination-focus-copy');
 const coordinationFocusScopeEl = document.querySelector('#coordination-focus-scope');
 const coordinationFocusMessageEl = document.querySelector('#coordination-focus-message');
@@ -108,6 +118,8 @@ const state = {
   messages: [],
   scopeExternalReferences: [],
   messageExternalReferences: [],
+  linkedContextResults: [],
+  linkedContextQuery: null,
   relays: [],
   handoffs: [],
   selectedChannelId: null,
@@ -249,6 +261,27 @@ function currentMessage() {
 
 function currentWorkspaceLabel() {
   return workspaceSelect.selectedOptions[0]?.textContent ?? selectedWorkspace();
+}
+
+function currentLinkedContextQuery() {
+  return state.linkedContextQuery ?? null;
+}
+
+function setLinkedContextQuery(query) {
+  if (!query?.system || !query?.externalId) {
+    state.linkedContextQuery = null;
+    linkedContextSystemEl.value = externalReferenceSystems[0] ?? '';
+    linkedContextExternalIdEl.value = '';
+    return;
+  }
+
+  state.linkedContextQuery = {
+    system: query.system,
+    externalId: query.externalId,
+    title: query.title ?? ''
+  };
+  linkedContextSystemEl.value = query.system;
+  linkedContextExternalIdEl.value = query.externalId;
 }
 
 function hasSelectionRoute(route) {
@@ -1012,7 +1045,7 @@ function renderCoordinationComposerOptions() {
   handoffSubmitEl.disabled = !canCoordinate || handoffTargets.length === 0;
 }
 
-function renderReferenceCards(container, references, emptyText) {
+function renderReferenceCards(container, references, emptyText, options = {}) {
   container.innerHTML = '';
   if (!references.length) {
     container.innerHTML = `<div class="empty-state">${escapeHtml(emptyText)}</div>`;
@@ -1032,8 +1065,84 @@ function renderReferenceCards(container, references, emptyText) {
       ${href
         ? `<a class="reference-link" href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${escapeHtml(reference.url)}</a>`
         : `<div class="reference-link muted">${escapeHtml(reference.url)}</div>`}
+      ${options.onLookup
+        ? '<div class="record-action-row"><button type="button" class="ghost-button reference-lookup">Find linked context</button></div>'
+        : ''}
       <div class="reference-card-meta">Created by ${escapeHtml(actorName(reference.createdByIdentityId))} | ${escapeHtml(formatTimestamp(reference.createdAt))}</div>
     `;
+
+    if (options.onLookup) {
+      card.querySelector('.reference-lookup')?.addEventListener('click', () => {
+        options.onLookup(reference);
+      });
+    }
+
+    container.appendChild(card);
+  }
+}
+
+function linkedContextOwnerMeta(result) {
+  const route = result?.route ?? {};
+  if (route.directConversationId) {
+    return route.messageId
+      ? `Direct conversation | linked message ${route.messageId}`
+      : 'Direct conversation';
+  }
+
+  const parts = [];
+  if (route.workspaceId) {
+    parts.push(`Workspace ${route.workspaceId}`);
+  }
+  if (route.channelId) {
+    parts.push(`Channel ${route.channelId}`);
+  }
+  if (route.postId) {
+    parts.push(`Post ${route.postId}`);
+  }
+  if (route.threadId) {
+    parts.push(`Thread ${route.threadId}`);
+  }
+  if (route.messageId) {
+    parts.push(`Message ${route.messageId}`);
+  }
+  return parts.join(' | ') || 'No linked NEXUS route metadata';
+}
+
+function renderLinkedContextCards(container, results, emptyText) {
+  container.innerHTML = '';
+  if (!results.length) {
+    container.innerHTML = `<div class="empty-state">${escapeHtml(emptyText)}</div>`;
+    return;
+  }
+
+  for (const result of results) {
+    const card = document.createElement('article');
+    card.className = 'reference-card';
+    const selection = buildLinkedContextSelection(result, selectedActor());
+    card.innerHTML = `
+      <div class="reference-card-top">
+        <strong>${escapeHtml(result.owner?.label ?? `${result.reference?.ownerType ?? 'owner'}:${result.reference?.ownerId ?? 'unknown'}`)}</strong>
+        <span class="pill">${escapeHtml(result.reference?.system ?? 'xref')}</span>
+      </div>
+      <div class="reference-card-meta">${escapeHtml(`${result.reference?.relationType ?? 'relatesTo'} | ${result.reference?.externalId ?? ''}`)}</div>
+      <div class="reference-card-meta">${escapeHtml(linkedContextOwnerMeta(result))}</div>
+      <div class="reference-card-meta">${escapeHtml(summarizeLinkedContextPath(result))}</div>
+      ${selection
+        ? '<div class="record-action-row"><button type="button" class="ghost-button linked-context-jump">Open linked context</button></div>'
+        : ''}
+      <div class="reference-card-meta">${escapeHtml(formatTimestamp(result.reference?.createdAt))}</div>
+    `;
+
+    if (selection) {
+      card.querySelector('.linked-context-jump')?.addEventListener('click', () => {
+        applySelectionRoute(selection, { announceFailures: true }).then(() => {
+          setStatus(`Opened linked NEXUS context for ${result.reference?.system ?? 'external'}:${result.reference?.externalId ?? ''}.`, 'success');
+        }).catch((error) => {
+          setStatus(error.message, 'error');
+        });
+      });
+    }
+
     container.appendChild(card);
   }
 }
@@ -1042,6 +1151,10 @@ function clearReferenceComposer() {
   referenceExternalIdEl.value = '';
   referenceUrlEl.value = '';
   referenceTitleEl.value = '';
+}
+
+function updateLinkedContextComposerState() {
+  linkedContextSubmitEl.disabled = !linkedContextSystemEl.value || !linkedContextExternalIdEl.value.trim();
 }
 
 function coordinationCountsForMessage(messageId) {
@@ -1534,24 +1647,66 @@ function renderMessages() {
 
 function renderExternalReferences() {
   const message = currentMessage();
+  const linkedQuery = currentLinkedContextQuery();
   scopeReferenceCopyEl.textContent = state.selectedScope
     ? `${currentScopeLabel()} | ${state.scopeExternalReferences.length} reference${state.scopeExternalReferences.length === 1 ? '' : 's'}`
     : 'Select a scope to load its references.';
   messageReferenceCopyEl.textContent = message
     ? `${actorName(message.authorIdentityId)} | ${state.messageExternalReferences.length} reference${state.messageExternalReferences.length === 1 ? '' : 's'}`
     : 'Select a message to inspect message-level references.';
+  linkedContextCopyEl.textContent = linkedQuery
+    ? `${linkedQuery.system.toUpperCase()} ${linkedQuery.externalId} | ${state.linkedContextResults.length} readable linked context${state.linkedContextResults.length === 1 ? '' : 's'}`
+    : 'Run a read-only reverse lookup to find readable NEXUS context linked to an external item.';
 
   renderReferenceCards(
     scopeReferencesEl,
     state.scopeExternalReferences,
-    'No external references are attached to the current scope yet.'
+    'No external references are attached to the current scope yet.',
+    {
+      onLookup(reference) {
+        setLinkedContextQuery({
+          system: reference.system,
+          externalId: reference.externalId,
+          title: reference.title
+        });
+        reloadLinkedContextLookup().then(() => {
+          renderAll();
+          setStatus(`Loaded linked NEXUS context for ${reference.system}:${reference.externalId}.`, 'success');
+        }).catch((error) => {
+          setStatus(error.message, 'error');
+        });
+      }
+    }
   );
   renderReferenceCards(
     messageReferencesEl,
     state.messageExternalReferences,
-    'No external references are attached to the selected message yet.'
+    'No external references are attached to the selected message yet.',
+    {
+      onLookup(reference) {
+        setLinkedContextQuery({
+          system: reference.system,
+          externalId: reference.externalId,
+          title: reference.title
+        });
+        reloadLinkedContextLookup().then(() => {
+          renderAll();
+          setStatus(`Loaded linked NEXUS context for ${reference.system}:${reference.externalId}.`, 'success');
+        }).catch((error) => {
+          setStatus(error.message, 'error');
+        });
+      }
+    }
+  );
+  renderLinkedContextCards(
+    linkedContextResultsEl,
+    state.linkedContextResults,
+    linkedQuery
+      ? 'No readable NEXUS context is currently linked to that external item for this actor.'
+      : 'Choose a system and external ID to find linked NEXUS context.'
   );
   renderReferenceOwnerOptions();
+  updateLinkedContextComposerState();
 }
 
 function renderCoordinationRecords() {
@@ -2028,6 +2183,18 @@ async function loadExternalReferences() {
   }
 }
 
+async function reloadLinkedContextLookup() {
+  const query = currentLinkedContextQuery();
+  if (!query) {
+    state.linkedContextResults = [];
+    return;
+  }
+
+  state.linkedContextResults = await getJson(
+    `/api/external-reference-links?actorId=${encodeURIComponent(selectedActor())}&system=${encodeURIComponent(query.system)}&externalId=${encodeURIComponent(query.externalId)}`
+  );
+}
+
 async function loadCoordinationRecords() {
   if (!state.selectedScope) {
     state.relays = [];
@@ -2286,7 +2453,9 @@ async function refreshAll() {
   await loadDirectConversations();
   await loadChannels();
   await syncSelection();
+  await reloadLinkedContextLookup();
   await runSearch();
+  renderAll();
 }
 
 directComposerEl.addEventListener('submit', async (event) => {
@@ -2453,6 +2622,14 @@ searchEl.addEventListener('input', () => {
   });
 });
 
+linkedContextSystemEl.addEventListener('change', () => {
+  updateLinkedContextComposerState();
+});
+
+linkedContextExternalIdEl.addEventListener('input', () => {
+  updateLinkedContextComposerState();
+});
+
 coordinationFocusScopeEl.addEventListener('click', () => {
   state.coordinationFocusMode = 'scope';
   renderAll();
@@ -2465,6 +2642,27 @@ coordinationFocusMessageEl.addEventListener('click', () => {
 
   state.coordinationFocusMode = 'message';
   renderAll();
+});
+
+linkedContextFormEl.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const system = linkedContextSystemEl.value;
+  const externalId = linkedContextExternalIdEl.value.trim();
+
+  if (!system || !externalId) {
+    setStatus('Choose a system and external ID before running a linked-context lookup.', 'error');
+    return;
+  }
+
+  try {
+    setLinkedContextQuery({ system, externalId });
+    await reloadLinkedContextLookup();
+    renderAll();
+    setStatus(`Loaded linked NEXUS context for ${system}:${externalId}.`, 'success');
+  }
+  catch (error) {
+    setStatus(error.message, 'error');
+  }
 });
 
 referenceComposerEl.addEventListener('submit', async (event) => {
@@ -2481,18 +2679,24 @@ referenceComposerEl.addEventListener('submit', async (event) => {
   }
 
   try {
+    const createdSystem = referenceSystemEl.value;
+    const createdExternalId = referenceExternalIdEl.value.trim();
     await postJson('/api/external-references', {
       actorId: selectedActor(),
       ownerType: owner.ownerType,
       ownerId: owner.ownerId,
-      system: referenceSystemEl.value,
+      system: createdSystem,
       relationType: referenceRelationEl.value,
-      externalId: referenceExternalIdEl.value.trim(),
+      externalId: createdExternalId,
       url: referenceUrlEl.value.trim(),
       title: referenceTitleEl.value.trim()
     });
     clearReferenceComposer();
     await loadExternalReferences();
+    const activeQuery = currentLinkedContextQuery();
+    if (activeQuery && activeQuery.system === createdSystem && activeQuery.externalId === createdExternalId) {
+      await reloadLinkedContextLookup();
+    }
     renderAll();
     setStatus(`Created external reference on ${owner.ownerType}.`, 'success');
   }
@@ -2615,6 +2819,11 @@ for (const system of externalReferenceSystems) {
   option.value = system;
   option.textContent = system.toUpperCase();
   referenceSystemEl.appendChild(option);
+
+  const linkedOption = document.createElement('option');
+  linkedOption.value = system;
+  linkedOption.textContent = system.toUpperCase();
+  linkedContextSystemEl.appendChild(linkedOption);
 }
 for (const relation of externalReferenceRelations) {
   const option = document.createElement('option');
@@ -2622,6 +2831,7 @@ for (const relation of externalReferenceRelations) {
   option.textContent = relation;
   referenceRelationEl.appendChild(option);
 }
+setLinkedContextQuery(null);
 const initialRoute = parseSelectionRouteHash(window.location.hash);
 await loadIdentities();
 await loadWorkspaces();

@@ -189,6 +189,24 @@
               </div>
               <div id="message-references" class="reference-list"></div>
             </div>
+            <div class="reference-group">
+              <div class="reference-group-header">
+                <strong>Linked context</strong>
+                <span id="linked-context-copy" class="muted">Run a read-only reverse lookup to find readable NEXUS context linked to an external item.</span>
+              </div>
+              <div id="linked-context-results" class="reference-list"></div>
+              <form id="linked-context-form" class="composer compact-composer">
+                <label class="field compact-field">
+                  <span>Lookup system</span>
+                  <select id="linked-context-system"></select>
+                </label>
+                <label class="field compact-field">
+                  <span>External ID</span>
+                  <input id="linked-context-external-id" type="text" placeholder="ANVIL-42 or repo#123">
+                </label>
+                <button id="linked-context-submit" type="submit">Find Linked Context</button>
+              </form>
+            </div>
             <form id="reference-composer" class="composer compact-composer">
               <label class="field compact-field">
                 <span>Attach reference to</span>

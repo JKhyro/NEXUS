@@ -324,6 +324,174 @@ test('external references can attach to channel, post, thread, and direct owners
   });
 });
 
+test('reverse external reference lookup returns readable linked contexts across owner types', async () => {
+  await withService(async (service) => {
+    const createdMessage = await fetch(`${service.url}/api/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        scopeType: 'channel',
+        scopeId: 'channel-requests',
+        body: 'Request linked to ANVIL-42'
+      })
+    }).then((response) => response.json());
+
+    const post = await fetch(`${service.url}/api/posts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        channelId: 'channel-report',
+        title: 'Report linked to ANVIL-42',
+        body: 'Opening report post'
+      })
+    }).then((response) => response.json());
+
+    const thread = await fetch(`${service.url}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        postId: post.post.id,
+        title: 'Follow-up linked thread'
+      })
+    }).then((response) => response.json());
+
+    const directConversation = await fetch(`${service.url}/api/direct-conversations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        memberIdentityIds: ['identity-jack', 'identity-kira']
+      })
+    }).then((response) => response.json());
+
+    const referenceInputs = [
+      {
+        ownerType: 'message',
+        ownerId: createdMessage.message.id,
+        system: 'anvil',
+        relationType: 'tracks',
+        externalId: 'ANVIL-42',
+        url: 'https://example.invalid/anvil/42/message',
+        title: 'Linked request message'
+      },
+      {
+        ownerType: 'post',
+        ownerId: post.post.id,
+        system: 'anvil',
+        relationType: 'reportedBy',
+        externalId: 'ANVIL-42',
+        url: 'https://example.invalid/anvil/42/post',
+        title: 'Linked report post'
+      },
+      {
+        ownerType: 'thread',
+        ownerId: thread.id,
+        system: 'anvil',
+        relationType: 'implements',
+        externalId: 'ANVIL-42',
+        url: 'https://example.invalid/anvil/42/thread',
+        title: 'Linked report thread'
+      },
+      {
+        ownerType: 'direct',
+        ownerId: directConversation.id,
+        system: 'anvil',
+        relationType: 'relatesTo',
+        externalId: 'ANVIL-42',
+        url: 'https://example.invalid/anvil/42/direct',
+        title: 'Linked direct conversation'
+      }
+    ];
+
+    for (const reference of referenceInputs) {
+      await fetch(`${service.url}/api/external-references`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          actorId: 'identity-jack',
+          ...reference
+        })
+      });
+    }
+
+    const links = await fetch(
+      `${service.url}/api/external-reference-links?actorId=identity-jack&system=anvil&externalId=ANVIL-42`
+    ).then((response) => response.json());
+
+    assert.equal(links.length, 4);
+    const byOwnerType = new Map(links.map((link) => [link.owner.ownerType, link]));
+
+    assert.equal(byOwnerType.get('message').route.channelId, 'channel-requests');
+    assert.equal(byOwnerType.get('message').route.messageId, createdMessage.message.id);
+    assert.equal(byOwnerType.get('message').route.scopeType, 'channel');
+    assert.equal(byOwnerType.get('post').route.channelId, 'channel-report');
+    assert.equal(byOwnerType.get('post').route.postId, post.post.id);
+    assert.equal(byOwnerType.get('post').route.scopeType, 'post');
+    assert.equal(byOwnerType.get('thread').route.channelId, 'channel-report');
+    assert.equal(byOwnerType.get('thread').route.postId, post.post.id);
+    assert.equal(byOwnerType.get('thread').route.threadId, thread.id);
+    assert.equal(byOwnerType.get('thread').route.scopeType, 'thread');
+    assert.equal(byOwnerType.get('direct').route.directConversationId, directConversation.id);
+    assert.equal(byOwnerType.get('direct').route.scopeType, 'direct');
+  });
+});
+
+test('reverse external reference lookup excludes unreadable linked contexts', async () => {
+  await withService(async (service) => {
+    const readable = await fetch(`${service.url}/api/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        scopeType: 'channel',
+        scopeId: 'channel-requests',
+        body: 'Readable linked message'
+      })
+    }).then((response) => response.json());
+
+    const unreadable = await fetch(`${service.url}/api/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        scopeType: 'channel',
+        scopeId: 'channel-hera',
+        body: 'Unreadable linked message'
+      })
+    }).then((response) => response.json());
+
+    for (const message of [readable.message, unreadable.message]) {
+      await fetch(`${service.url}/api/external-references`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          actorId: 'identity-jack',
+          ownerType: 'message',
+          ownerId: message.id,
+          system: 'github',
+          relationType: 'tracks',
+          externalId: 'JKhyro/NEXUS#46',
+          url: 'https://github.com/JKhyro/NEXUS/issues/46',
+          title: 'Reverse linked-context lookup'
+        })
+      });
+    }
+
+    const links = await fetch(
+      `${service.url}/api/external-reference-links?actorId=identity-yura&system=github&externalId=JKhyro%2FNEXUS%2346`
+    ).then((response) => response.json());
+
+    assert.equal(links.length, 1);
+    assert.equal(links[0].owner.ownerType, 'message');
+    assert.equal(links[0].owner.ownerId, readable.message.id);
+    assert.equal(links[0].route.channelId, 'channel-requests');
+    assert.equal(links.some((link) => link.owner.ownerId === unreadable.message.id), false);
+  });
+});
+
 test('relays and handoffs can be listed for a readable scope', async () => {
   await withService(async (service) => {
     service.store.chatbase.relays.push(
