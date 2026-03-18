@@ -50,6 +50,7 @@ It is intentionally small and internal-first. The contract is designed to power 
 - `GET /api/search?actorId=...&q=...`
 - `GET /api/external-references?actorId=...&ownerType=...&ownerId=...`
 - `GET /api/external-reference-links?actorId=...&system=...&externalId=...`
+  Returns every readable NEXUS owner or message linked to the requested external item, including route metadata and coordination summaries for the linked scope and, when present, the linked message.
 
 ### Write
 
@@ -79,7 +80,7 @@ It is intentionally small and internal-first. The contract is designed to power 
 - `GET /api/health` must also expose `deploymentMode`, `staticMode`, and any safe origin metadata needed to tell whether the service is running as a desktop-managed local surface or a hosted-capable/API-only surface.
 - `POST /api/messages` and `POST /api/posts` may carry inline `attachments` arrays so composition stays on the shared message contract instead of depending on a separate upload/session model in the MVP.
 - `GET /api/external-references` and `POST /api/external-references` must work uniformly for scope owners (`channel`, `post`, `thread`, `direct`) and message owners so desktop and future web clients do not fork their reference model.
-- `GET /api/external-reference-links` must return every readable NEXUS owner or message currently linked to the requested external item, filtered by the requesting actor's normal visibility rules.
+- `GET /api/external-reference-links` must return every readable NEXUS owner or message currently linked to the requested external item, filtered by the requesting actor's normal visibility rules, and include read-only coordination summary counts for the linked scope and linked message when a message route exists.
 - Reverse linked-context results must include enough route metadata to reopen the linked NEXUS context without a second model, including any readable workspace, scope, post, thread, direct-conversation, and message identifiers needed by the client.
 - Reverse linked-context lookup is read-only. It does not create workflow objects or redefine the external reference owner model.
 - Records without read access must be omitted rather than partially disclosed.

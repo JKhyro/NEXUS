@@ -11,6 +11,7 @@ import {
 } from './selection-route.mjs';
 import {
   buildLinkedContextSelection,
+  summarizeLinkedContextCoordination,
   summarizeLinkedContextPath
 } from './linked-context.mjs';
 import {
@@ -1127,6 +1128,7 @@ function renderLinkedContextCards(container, results, emptyText) {
       <div class="reference-card-meta">${escapeHtml(`${result.reference?.relationType ?? 'relatesTo'} | ${result.reference?.externalId ?? ''}`)}</div>
       <div class="reference-card-meta">${escapeHtml(linkedContextOwnerMeta(result))}</div>
       <div class="reference-card-meta">${escapeHtml(summarizeLinkedContextPath(result))}</div>
+      <div class="reference-card-meta">${escapeHtml(summarizeLinkedContextCoordination(result))}</div>
       ${selection
         ? '<div class="record-action-row"><button type="button" class="ghost-button linked-context-jump">Open linked context</button></div>'
         : ''}

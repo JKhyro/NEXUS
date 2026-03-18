@@ -61,3 +61,27 @@ export function summarizeLinkedContextPath(result) {
 
   return parts.join(' | ') || 'No navigable route metadata';
 }
+
+function countLabel(type, count) {
+  return `${count} ${type}${count === 1 ? '' : 's'}`;
+}
+
+export function summarizeLinkedContextCoordination(result) {
+  const coordination = result?.coordination ?? null;
+  if (!coordination) {
+    return 'No recorded coordination yet.';
+  }
+
+  const parts = [];
+  const scopeRelayCount = Number(coordination.scope?.relayCount ?? 0);
+  const scopeHandoffCount = Number(coordination.scope?.handoffCount ?? 0);
+  parts.push(`Scope ${countLabel('relay', scopeRelayCount)} | ${countLabel('handoff', scopeHandoffCount)}`);
+
+  if (coordination.message) {
+    const messageRelayCount = Number(coordination.message.relayCount ?? 0);
+    const messageHandoffCount = Number(coordination.message.handoffCount ?? 0);
+    parts.push(`Message ${countLabel('relay', messageRelayCount)} | ${countLabel('handoff', messageHandoffCount)}`);
+  }
+
+  return parts.join(' || ');
+}

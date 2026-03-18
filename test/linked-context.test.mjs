@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildLinkedContextSelection,
+  summarizeLinkedContextCoordination,
   summarizeLinkedContextPath
 } from '../apps/web/public/linked-context.mjs';
 
@@ -76,5 +77,36 @@ test('summarizeLinkedContextPath renders direct and nested scope metadata', () =
       }
     }),
     'Channel channel-report | Post post-1 | Thread thread-1'
+  );
+});
+
+test('summarizeLinkedContextCoordination renders scope and message coordination counts', () => {
+  assert.equal(
+    summarizeLinkedContextCoordination({
+      coordination: {
+        scope: {
+          relayCount: 2,
+          handoffCount: 1
+        },
+        message: {
+          relayCount: 1,
+          handoffCount: 0
+        }
+      }
+    }),
+    'Scope 2 relays | 1 handoff || Message 1 relay | 0 handoffs'
+  );
+
+  assert.equal(
+    summarizeLinkedContextCoordination({
+      coordination: {
+        scope: {
+          relayCount: 0,
+          handoffCount: 0
+        },
+        message: null
+      }
+    }),
+    'Scope 0 relays | 0 handoffs'
   );
 });

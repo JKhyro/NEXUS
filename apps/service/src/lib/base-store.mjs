@@ -9,7 +9,12 @@ import {
   validateThreadCreateInput
 } from '../../../../packages/contracts/src/index.mjs';
 import { createId } from './ids.mjs';
-import { assertReadableScope, assertWritableScope, canReadChannel, canReadDirectConversation } from './policy.mjs';
+import {
+  assertReadableScope,
+  assertWritableScope,
+  canReadChannel,
+  canReadDirectConversation
+} from './policy.mjs';
 
 function nowIso() {
   return new Date().toISOString();
@@ -606,7 +611,8 @@ export class BaseNexusStore {
           ownerId: reference.ownerId,
           label: resolved.label
         },
-        route: resolved.route
+        route: resolved.route,
+        coordination: this.summarizeLinkedContextCoordination(resolved.route)
       };
     }
     catch (error) {
@@ -615,6 +621,32 @@ export class BaseNexusStore {
       }
       throw error;
     }
+  }
+
+  summarizeLinkedContextCoordination(route) {
+    if (!route?.scopeType || !route?.scopeId) {
+      return {
+        scope: {
+          relayCount: 0,
+          handoffCount: 0
+        },
+        message: null
+      };
+    }
+
+    const scope = {
+      relayCount: this.chatbase.relays.filter((relay) => recordTouchesScope(relay, route.scopeType, route.scopeId)).length,
+      handoffCount: this.chatbase.handoffs.filter((handoff) => recordTouchesScope(handoff, route.scopeType, route.scopeId)).length
+    };
+
+    const message = route.messageId
+      ? {
+          relayCount: this.chatbase.relays.filter((relay) => relay.messageId === route.messageId).length,
+          handoffCount: this.chatbase.handoffs.filter((handoff) => handoff.messageId === route.messageId).length
+        }
+      : null;
+
+    return { scope, message };
   }
 
   resolveExternalReferenceOwner(actorId, ownerType, ownerId) {

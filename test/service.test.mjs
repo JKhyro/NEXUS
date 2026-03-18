@@ -492,6 +492,79 @@ test('reverse external reference lookup excludes unreadable linked contexts', as
   });
 });
 
+test('reverse external reference lookup includes scope and message coordination summaries', async () => {
+  await withService(async (service) => {
+    const created = await fetch(`${service.url}/api/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        scopeType: 'channel',
+        scopeId: 'channel-requests',
+        body: 'Tracked request with coordination'
+      })
+    }).then((response) => response.json());
+
+    await fetch(`${service.url}/api/external-references`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        ownerType: 'message',
+        ownerId: created.message.id,
+        system: 'github',
+        relationType: 'tracks',
+        externalId: 'JKhyro/NEXUS#50',
+        url: 'https://github.com/JKhyro/NEXUS/issues/50',
+        title: 'Linked context coordination summary'
+      })
+    });
+
+    await fetch(`${service.url}/api/relays`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        scopeType: 'channel',
+        scopeId: 'channel-requests',
+        toScopeType: 'channel',
+        toScopeId: 'channel-workflow',
+        reason: 'Escalate tracked work for execution',
+        messageId: created.message.id
+      })
+    });
+
+    await fetch(`${service.url}/api/handoffs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        scopeType: 'channel',
+        scopeId: 'channel-requests',
+        toIdentityId: 'identity-kira',
+        rationale: 'Hand off tracked work for coordination',
+        messageId: created.message.id
+      })
+    });
+
+    const links = await fetch(
+      `${service.url}/api/external-reference-links?actorId=identity-jack&system=github&externalId=JKhyro%2FNEXUS%2350`
+    ).then((response) => response.json());
+
+    assert.equal(links.length, 1);
+    assert.deepEqual(links[0].coordination, {
+      scope: {
+        relayCount: 1,
+        handoffCount: 1
+      },
+      message: {
+        relayCount: 1,
+        handoffCount: 1
+      }
+    });
+  });
+});
+
 test('relays and handoffs can be listed for a readable scope', async () => {
   await withService(async (service) => {
     service.store.chatbase.relays.push(

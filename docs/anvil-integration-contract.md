@@ -64,7 +64,7 @@ An external reference includes:
 
 - NEXUS may attach an external reference to conversation objects now.
 - NEXUS does not create or own ANVIL tasks in this MVP.
-- NEXUS must be able to list and retrieve external references for any readable object.
+- NEXUS must be able to list and retrieve external references for any readable object, and reverse lookup must expose readable linked context plus coordination summaries without handing workflow ownership to NEXUS.
 - NEXUS must be able to retrieve readable linked conversation context by external item identity (`system + externalId`), not only list references from a known NEXUS owner.
 - Reverse linked-context results must respect NEXUS access policy and return only readable conversations, scopes, and messages.
 - Future ANVIL integration should reuse the same reference model rather than replace it.
