@@ -540,6 +540,17 @@ button:disabled {
   background: rgba(255, 255, 255, 0.8);
 }
 
+.link-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.link-action-copy {
+  margin-top: -8px;
+  line-height: 1.45;
+}
+
 .coordination-focus-copy {
   line-height: 1.45;
 }

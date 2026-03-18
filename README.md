@@ -98,6 +98,7 @@ The current desktop/web client can:
 - browse and create external references on scopes and selected messages for ANVIL, GitHub, or Discord-linked context
 - inspect and create relay and handoff records for the current scope, switch the coordination rail into a selected-message focus when needed, jump back to related messages when coordination records carry `messageId`, and see message-level coordination badges directly in the conversation view
 - keep the URL in sync with the current actor, workspace, scope, and selected-message context so operators can deep-link directly back into readable NEXUS state
+- copy a readable link to the current scope or the currently selected message directly from the client surface
 - search visible history and jump into matching channel, post, thread, or direct scopes
 
 For normal local use, copy [config/nexus.local.example.json](config/nexus.local.example.json) to `config/nexus.local.json` and fill in the real LIBRARY connection details. The service and desktop shell will pick that file up automatically.

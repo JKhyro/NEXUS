@@ -4,6 +4,7 @@ import {
   normalizeCoordinationFocusMode
 } from './coordination-focus.mjs';
 import {
+  buildSelectionRouteUrl,
   buildSelectionRouteHash,
   parseSelectionRouteHash
 } from './selection-route.mjs';
@@ -43,6 +44,9 @@ const healthEl = document.querySelector('#health');
 const searchEl = document.querySelector('#search');
 const searchResultsEl = document.querySelector('#search-results');
 const scopeSummaryEl = document.querySelector('#scope-summary');
+const copyScopeLinkEl = document.querySelector('#copy-scope-link');
+const copyMessageLinkEl = document.querySelector('#copy-message-link');
+const linkActionCopyEl = document.querySelector('#link-action-copy');
 const scopeReferenceCopyEl = document.querySelector('#scope-reference-copy');
 const scopeReferencesEl = document.querySelector('#scope-references');
 const messageReferenceCopyEl = document.querySelector('#message-reference-copy');
@@ -136,6 +140,23 @@ async function postJson(path, payload) {
     throw new Error(result.error ?? `Request failed for ${path}`);
   }
   return result;
+}
+
+async function writeClipboardText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', 'readonly');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  textarea.remove();
 }
 
 function selectedActor() {
@@ -268,6 +289,26 @@ function currentSelectionRouteHash() {
   });
 }
 
+function currentScopeSelection() {
+  return {
+    actorId: selectedActor(),
+    workspaceId: selectedWorkspace(),
+    directConversationId: state.selectedDirectConversationId,
+    channelId: state.selectedChannelId,
+    postId: state.selectedPostId,
+    threadId: state.selectedThreadId,
+    coordinationFocusMode: 'scope'
+  };
+}
+
+function currentMessageSelection() {
+  return {
+    ...currentScopeSelection(),
+    messageId: state.selectedMessageId,
+    coordinationFocusMode: currentCoordinationFocusMode()
+  };
+}
+
 function syncSelectionRoute() {
   if (routeSyncSuspended) {
     return;
@@ -281,6 +322,26 @@ function syncSelectionRoute() {
   const url = new URL(window.location.href);
   url.hash = nextHash.startsWith('#') ? nextHash.slice(1) : nextHash;
   history.replaceState(null, '', url);
+}
+
+function renderLinkActions() {
+  const hasScope = Boolean(state.selectedScope);
+  const message = currentMessage();
+
+  copyScopeLinkEl.disabled = !hasScope;
+  copyMessageLinkEl.disabled = !message;
+
+  if (!hasScope) {
+    linkActionCopyEl.textContent = 'Select a readable scope to copy a NEXUS link.';
+    return;
+  }
+
+  if (!message) {
+    linkActionCopyEl.textContent = 'Copy the current scope link, or select a message to unlock a message-specific link.';
+    return;
+  }
+
+  linkActionCopyEl.textContent = 'Copy either the current scope link or the selected-message context link.';
 }
 
 function actorName(identityId) {
@@ -1506,6 +1567,7 @@ function renderAll() {
   renderCoordinationRecords();
   renderScopeHeader();
   renderScopeSummary();
+  renderLinkActions();
   updateComposerState();
   syncSelectionRoute();
 }
@@ -2015,6 +2077,37 @@ handoffComposerEl.addEventListener('submit', async (event) => {
     await loadCoordinationRecords();
     renderAll();
     setStatus(`Created handoff in ${currentScopeLabel()}.`, 'success');
+  }
+  catch (error) {
+    setStatus(error.message, 'error');
+  }
+});
+
+copyScopeLinkEl.addEventListener('click', async () => {
+  if (!state.selectedScope) {
+    setStatus('Select a readable scope before copying a link.', 'error');
+    return;
+  }
+
+  try {
+    await writeClipboardText(buildSelectionRouteUrl(window.location.href, currentScopeSelection()));
+    setStatus(`Copied a link to ${currentScopeLabel()}.`, 'success');
+  }
+  catch (error) {
+    setStatus(error.message, 'error');
+  }
+});
+
+copyMessageLinkEl.addEventListener('click', async () => {
+  const message = currentMessage();
+  if (!message) {
+    setStatus('Select a message before copying a message-specific link.', 'error');
+    return;
+  }
+
+  try {
+    await writeClipboardText(buildSelectionRouteUrl(window.location.href, currentMessageSelection()));
+    setStatus(`Copied a link to the selected message from ${actorName(message.authorIdentityId)}.`, 'success');
   }
   catch (error) {
     setStatus(error.message, 'error');

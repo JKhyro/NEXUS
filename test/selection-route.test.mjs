@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildSelectionRouteUrl,
   buildSelectionRouteHash,
   parseSelectionRouteHash
 } from '../apps/web/public/selection-route.mjs';
@@ -86,4 +87,24 @@ test('parseSelectionRouteHash falls back safely on missing or invalid values', (
     parseSelectionRouteHash('#coordination=unexpected').coordinationFocusMode,
     'scope'
   );
+});
+
+test('buildSelectionRouteUrl preserves the base URL and applies the selection hash', () => {
+  const href = buildSelectionRouteUrl('https://nexus.example.invalid/app#stale', {
+    actorId: 'identity-jack',
+    workspaceId: 'workspace-internal-core',
+    channelId: 'channel-general',
+    messageId: 'message-1',
+    coordinationFocusMode: 'message'
+  });
+
+  assert.equal(
+    href,
+    'https://nexus.example.invalid/app#actor=identity-jack&workspace=workspace-internal-core&channel=channel-general&message=message-1&coordination=message'
+  );
+});
+
+test('buildSelectionRouteUrl clears the hash when there is no selection state to persist', () => {
+  const href = buildSelectionRouteUrl('https://nexus.example.invalid/app#stale', {});
+  assert.equal(href, 'https://nexus.example.invalid/app');
 });

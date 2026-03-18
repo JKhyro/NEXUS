@@ -49,3 +49,9 @@ export function buildSelectionRouteHash(selection) {
   const query = params.toString();
   return query ? `#${query}` : '';
 }
+
+export function buildSelectionRouteUrl(baseHref, selection) {
+  const url = new URL(baseHref);
+  url.hash = buildSelectionRouteHash(selection);
+  return url.toString();
+}
