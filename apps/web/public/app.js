@@ -1,3 +1,9 @@
+import {
+  coordinationCountsForMessage as deriveCoordinationCountsForMessage,
+  filterCoordinationRecords,
+  normalizeCoordinationFocusMode
+} from './coordination-focus.mjs';
+
 const actorSelect = document.querySelector('#actor');
 const workspaceSelect = document.querySelector('#workspace');
 const channelsEl = document.querySelector('#channels');
@@ -37,6 +43,9 @@ const scopeReferenceCopyEl = document.querySelector('#scope-reference-copy');
 const scopeReferencesEl = document.querySelector('#scope-references');
 const messageReferenceCopyEl = document.querySelector('#message-reference-copy');
 const messageReferencesEl = document.querySelector('#message-references');
+const coordinationFocusCopyEl = document.querySelector('#coordination-focus-copy');
+const coordinationFocusScopeEl = document.querySelector('#coordination-focus-scope');
+const coordinationFocusMessageEl = document.querySelector('#coordination-focus-message');
 const relayCopyEl = document.querySelector('#relay-copy');
 const relayListEl = document.querySelector('#relay-list');
 const handoffCopyEl = document.querySelector('#handoff-copy');
@@ -81,6 +90,7 @@ const state = {
   selectedPostId: null,
   selectedThreadId: null,
   selectedMessageId: null,
+  coordinationFocusMode: 'scope',
   selectedScope: null,
   health: null
 };
@@ -566,12 +576,17 @@ function clearReferenceComposer() {
 }
 
 function coordinationCountsForMessage(messageId) {
-  const relayCount = state.relays.filter((relay) => relay.messageId === messageId).length;
-  const handoffCount = state.handoffs.filter((handoff) => handoff.messageId === messageId).length;
-  return {
-    relayCount,
-    handoffCount
-  };
+  return deriveCoordinationCountsForMessage(state.relays, state.handoffs, messageId);
+}
+
+function currentCoordinationFocusMode() {
+  const mode = normalizeCoordinationFocusMode(state.coordinationFocusMode, state.selectedMessageId);
+  state.coordinationFocusMode = mode;
+  return mode;
+}
+
+function filteredCoordinationRecords(records) {
+  return filterCoordinationRecords(records, currentCoordinationFocusMode(), state.selectedMessageId);
 }
 
 function renderMessageCoordinationBadges(messageId) {
@@ -928,6 +943,10 @@ function renderMessages() {
   for (const message of state.messages) {
     const article = document.createElement('article');
     article.className = `message-card${state.selectedMessageId === message.id ? ' active' : ''}`;
+    article.tabIndex = 0;
+    article.setAttribute('role', 'button');
+    article.setAttribute('aria-pressed', state.selectedMessageId === message.id ? 'true' : 'false');
+    article.setAttribute('aria-label', `Select message from ${actorName(message.authorIdentityId)} at ${formatTimestamp(message.createdAt)}`);
     const sourceSystem = message.source?.system ?? 'nexus';
     const sourcedFromDiscord = sourceSystem === 'discord';
     article.innerHTML = `
@@ -942,10 +961,25 @@ function renderMessages() {
       ${renderMessageCoordinationBadges(message.id)}
       ${renderAttachmentMarkup(message.attachments)}
     `;
-    article.addEventListener('click', async () => {
+    const selectMessage = async () => {
       state.selectedMessageId = message.id;
       await loadExternalReferences();
       renderAll();
+    };
+    article.addEventListener('click', () => {
+      selectMessage().catch((error) => {
+        setStatus(error.message, 'error');
+      });
+    });
+    article.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') {
+        return;
+      }
+
+      event.preventDefault();
+      selectMessage().catch((error) => {
+        setStatus(error.message, 'error');
+      });
     });
     messagesEl.appendChild(article);
   }
@@ -974,15 +1008,57 @@ function renderExternalReferences() {
 }
 
 function renderCoordinationRecords() {
-  relayCopyEl.textContent = state.selectedScope
-    ? `${currentScopeLabel()} | ${state.relays.length} relay${state.relays.length === 1 ? '' : 's'}`
-    : 'Select a scope to inspect relay records.';
-  handoffCopyEl.textContent = state.selectedScope
-    ? `${currentScopeLabel()} | ${state.handoffs.length} handoff${state.handoffs.length === 1 ? '' : 's'}`
-    : 'Select a scope to inspect handoff records.';
+  const message = currentMessage();
+  const focusMode = currentCoordinationFocusMode();
+  const focusedRelays = filteredCoordinationRecords(state.relays);
+  const focusedHandoffs = filteredCoordinationRecords(state.handoffs);
 
-  renderRecordCards(relayListEl, state.relays, 'relay', 'No relays touch the current scope yet.');
-  renderRecordCards(handoffListEl, state.handoffs, 'handoff', 'No handoffs touch the current scope yet.');
+  coordinationFocusScopeEl.classList.toggle('active', focusMode === 'scope');
+  coordinationFocusMessageEl.classList.toggle('active', focusMode === 'message');
+  coordinationFocusMessageEl.disabled = !message;
+
+  if (!state.selectedScope) {
+    coordinationFocusCopyEl.textContent = 'Select a scope to inspect relay and handoff records.';
+    relayCopyEl.textContent = 'Select a scope to inspect relay records.';
+    handoffCopyEl.textContent = 'Select a scope to inspect handoff records.';
+    renderRecordCards(relayListEl, state.relays, 'relay', 'No relays touch the current scope yet.');
+    renderRecordCards(handoffListEl, state.handoffs, 'handoff', 'No handoffs touch the current scope yet.');
+    renderCoordinationComposerOptions();
+    return;
+  }
+
+  if (message) {
+    coordinationFocusCopyEl.textContent = focusMode === 'message'
+      ? `Focused on the selected message from ${actorName(message.authorIdentityId)}. New relays and handoffs will attach to this message.`
+      : `Showing all coordination in ${currentScopeLabel()}. Switch to Selected message to focus on the active message. New relays and handoffs will still attach to it.`;
+  }
+  else {
+    coordinationFocusCopyEl.textContent = `Showing all coordination in ${currentScopeLabel()}. Select a message to unlock selected-message focus.`;
+  }
+
+  if (focusMode === 'message' && message) {
+    relayCopyEl.textContent = `${actorName(message.authorIdentityId)} | ${focusedRelays.length} relay${focusedRelays.length === 1 ? '' : 's'} for selected message`;
+    handoffCopyEl.textContent = `${actorName(message.authorIdentityId)} | ${focusedHandoffs.length} handoff${focusedHandoffs.length === 1 ? '' : 's'} for selected message`;
+    renderRecordCards(
+      relayListEl,
+      focusedRelays,
+      'relay',
+      'No relays touch the selected message yet. Switch back to Scope to review all coordination in this lane.'
+    );
+    renderRecordCards(
+      handoffListEl,
+      focusedHandoffs,
+      'handoff',
+      'No handoffs touch the selected message yet. Switch back to Scope to review all coordination in this lane.'
+    );
+  }
+  else {
+    relayCopyEl.textContent = `${currentScopeLabel()} | ${state.relays.length} relay${state.relays.length === 1 ? '' : 's'} in scope`;
+    handoffCopyEl.textContent = `${currentScopeLabel()} | ${state.handoffs.length} handoff${state.handoffs.length === 1 ? '' : 's'} in scope`;
+    renderRecordCards(relayListEl, state.relays, 'relay', 'No relays touch the current scope yet.');
+    renderRecordCards(handoffListEl, state.handoffs, 'handoff', 'No handoffs touch the current scope yet.');
+  }
+
   renderCoordinationComposerOptions();
 }
 
@@ -1664,6 +1740,20 @@ searchEl.addEventListener('input', () => {
   runSearch().catch((error) => {
     setStatus(error.message, 'error');
   });
+});
+
+coordinationFocusScopeEl.addEventListener('click', () => {
+  state.coordinationFocusMode = 'scope';
+  renderAll();
+});
+
+coordinationFocusMessageEl.addEventListener('click', () => {
+  if (!state.selectedMessageId) {
+    return;
+  }
+
+  state.coordinationFocusMode = 'message';
+  renderAll();
 });
 
 referenceComposerEl.addEventListener('submit', async (event) => {

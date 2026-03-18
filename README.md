@@ -96,7 +96,7 @@ The current desktop/web client can:
 - browse imported and newly created attachment metadata inline with messages
 - create forum posts and ordinary messages with inline attachment metadata through the same service contract
 - browse and create external references on scopes and selected messages for ANVIL, GitHub, or Discord-linked context
-- inspect and create relay and handoff records for the current scope to verify and record cross-lane movement during Discord cutover, jump back to related messages when coordination records carry `messageId`, and see message-level coordination badges directly in the conversation view
+- inspect and create relay and handoff records for the current scope, switch the coordination rail into a selected-message focus when needed, jump back to related messages when coordination records carry `messageId`, and see message-level coordination badges directly in the conversation view
 - search visible history and jump into matching channel, post, thread, or direct scopes
 
 For normal local use, copy [config/nexus.local.example.json](config/nexus.local.example.json) to `config/nexus.local.json` and fill in the real LIBRARY connection details. The service and desktop shell will pick that file up automatically.
