@@ -39,6 +39,61 @@ export function linkedContextOwnerType(result) {
   return String(result?.owner?.ownerType ?? result?.reference?.ownerType ?? 'unknown').trim() || 'unknown';
 }
 
+function normalizeLinkedContextSearchQuery(query) {
+  return String(query ?? '').trim().toLowerCase();
+}
+
+function linkedContextSearchableText(result) {
+  const route = result?.route ?? null;
+  const searchableParts = [
+    result?.owner?.label,
+    result?.owner?.ownerType,
+    result?.reference?.system,
+    result?.reference?.relationType,
+    result?.reference?.externalId,
+    result?.reference?.ownerType,
+    result?.reference?.ownerId,
+    result?.reference?.title,
+    result?.reference?.name,
+    result?.reference?.summary,
+    result?.reference?.description,
+    result?.reference?.body,
+    result?.reference?.url,
+    summarizeLinkedContextPath(result),
+    summarizeLinkedContextCoordination(result)
+  ];
+
+  if (route) {
+    searchableParts.push(
+      route.workspaceId,
+      route.channelId,
+      route.postId,
+      route.threadId,
+      route.directConversationId,
+      route.messageId
+    );
+  }
+
+  return searchableParts
+    .filter((part) => part !== null && part !== undefined)
+    .map((part) => String(part).trim().toLowerCase())
+    .filter(Boolean)
+    .join(' ');
+}
+
+export function linkedContextSearchResults(results, query = '') {
+  const normalizedQuery = normalizeLinkedContextSearchQuery(query);
+  if (!normalizedQuery) {
+    return [...(results ?? [])];
+  }
+
+  const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+  return [...(results ?? [])].filter((result) => {
+    const searchableText = linkedContextSearchableText(result);
+    return terms.every((term) => searchableText.includes(term));
+  });
+}
+
 export function linkedContextOwnerTypeLabel(ownerType) {
   switch (ownerType) {
     case 'channel':
@@ -70,8 +125,9 @@ function ownerTypeCountMap(results) {
   return counts;
 }
 
-export function linkedContextOwnerTypeFilters(results) {
-  const counts = ownerTypeCountMap(results);
+export function linkedContextOwnerTypeFilters(results, query = '') {
+  const searchedResults = linkedContextSearchResults(results, query);
+  const counts = ownerTypeCountMap(searchedResults);
   const options = [...counts.entries()]
     .sort(([leftType], [rightType]) => {
       const byOrder = ownerTypeSortKey(leftType) - ownerTypeSortKey(rightType);
@@ -89,29 +145,30 @@ export function linkedContextOwnerTypeFilters(results) {
   return [
     {
       value: 'all',
-      count: results?.length ?? 0,
+      count: searchedResults.length,
       label: 'All readable'
     },
     ...options
   ];
 }
 
-export function normalizeLinkedContextOwnerTypeFilter(filterValue, results) {
+export function normalizeLinkedContextOwnerTypeFilter(filterValue, results, query = '') {
   const normalized = String(filterValue ?? 'all').trim() || 'all';
   if (normalized === 'all') {
     return 'all';
   }
 
-  return linkedContextOwnerTypeFilters(results).some((option) => option.value === normalized)
+  return linkedContextOwnerTypeFilters(results, query).some((option) => option.value === normalized)
     ? normalized
     : 'all';
 }
 
-export function groupLinkedContextResults(results, filterValue = 'all') {
-  const normalizedFilter = normalizeLinkedContextOwnerTypeFilter(filterValue, results);
+export function groupLinkedContextResults(results, filterValue = 'all', query = '') {
+  const searchedResults = linkedContextSearchResults(results, query);
+  const normalizedFilter = normalizeLinkedContextOwnerTypeFilter(filterValue, results, query);
   const buckets = new Map();
 
-  for (const result of results ?? []) {
+  for (const result of searchedResults) {
     const ownerType = linkedContextOwnerType(result);
     if (normalizedFilter !== 'all' && ownerType !== normalizedFilter) {
       continue;
@@ -135,12 +192,13 @@ export function groupLinkedContextResults(results, filterValue = 'all') {
   });
 }
 
-export function summarizeLinkedContextFilter(results, filterValue = 'all') {
-  const normalizedFilter = normalizeLinkedContextOwnerTypeFilter(filterValue, results);
-  const filters = linkedContextOwnerTypeFilters(results);
+export function summarizeLinkedContextFilter(results, filterValue = 'all', query = '') {
+  const searchedResults = linkedContextSearchResults(results, query);
+  const normalizedFilter = normalizeLinkedContextOwnerTypeFilter(filterValue, results, query);
+  const filters = linkedContextOwnerTypeFilters(results, query);
   const activeFilter = filters.find((option) => option.value === normalizedFilter) ?? filters[0];
 
-  if ((results?.length ?? 0) === 0) {
+  if ((searchedResults?.length ?? 0) === 0) {
     return 'No owner-type groups are available for this lookup yet.';
   }
 

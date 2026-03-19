@@ -13,6 +13,8 @@ import {
   buildLinkedContextSelection,
   groupLinkedContextResults,
   linkedContextOwnerTypeFilters,
+  linkedContextOwnerTypeLabel,
+  linkedContextSearchResults,
   normalizeLinkedContextOwnerTypeFilter,
   summarizeLinkedContextFilter,
   summarizeLinkedContextCoordination,
@@ -78,6 +80,7 @@ const messageReferenceCopyEl = document.querySelector('#message-reference-copy')
 const messageReferencesEl = document.querySelector('#message-references');
 const linkedContextCopyEl = document.querySelector('#linked-context-copy');
 const linkedContextFilterCopyEl = document.querySelector('#linked-context-filter-copy');
+const linkedContextSearchEl = document.querySelector('#linked-context-search');
 const linkedContextFilterControlsEl = document.querySelector('#linked-context-filter-controls');
 const linkedContextResultsEl = document.querySelector('#linked-context-results');
 const linkedContextFormEl = document.querySelector('#linked-context-form');
@@ -127,6 +130,7 @@ const state = {
   messageExternalReferences: [],
   linkedContextResults: [],
   linkedContextQuery: null,
+  linkedContextSearchQuery: '',
   linkedContextOwnerTypeFilter: 'all',
   relays: [],
   handoffs: [],
@@ -275,6 +279,10 @@ function currentLinkedContextQuery() {
   return state.linkedContextQuery ?? null;
 }
 
+function currentLinkedContextSearchQuery() {
+  return state.linkedContextSearchQuery ?? '';
+}
+
 function currentLinkedContextOwnerTypeFilter() {
   const normalized = normalizeLinkedContextOwnerTypeFilter(state.linkedContextOwnerTypeFilter, state.linkedContextResults);
   state.linkedContextOwnerTypeFilter = normalized;
@@ -285,10 +293,18 @@ function setLinkedContextOwnerTypeFilter(filterValue) {
   state.linkedContextOwnerTypeFilter = normalizeLinkedContextOwnerTypeFilter(filterValue, state.linkedContextResults);
 }
 
+function setLinkedContextSearchQuery(query) {
+  state.linkedContextSearchQuery = String(query ?? '');
+  if (linkedContextSearchEl) {
+    linkedContextSearchEl.value = state.linkedContextSearchQuery;
+  }
+}
+
 function setLinkedContextQuery(query) {
   if (!query?.system || !query?.externalId) {
     state.linkedContextQuery = null;
     state.linkedContextOwnerTypeFilter = 'all';
+    setLinkedContextSearchQuery('');
     linkedContextSystemEl.value = externalReferenceSystems[0] ?? '';
     linkedContextExternalIdEl.value = '';
     return;
@@ -300,8 +316,13 @@ function setLinkedContextQuery(query) {
     title: query.title ?? ''
   };
   state.linkedContextOwnerTypeFilter = 'all';
+  setLinkedContextSearchQuery('');
   linkedContextSystemEl.value = query.system;
   linkedContextExternalIdEl.value = query.externalId;
+}
+
+function filteredLinkedContextResults(results = state.linkedContextResults, searchQuery = currentLinkedContextSearchQuery()) {
+  return linkedContextSearchResults(results, searchQuery);
 }
 
 function hasSelectionRoute(route) {
@@ -1196,11 +1217,41 @@ function updateLinkedContextComposerState() {
   linkedContextSubmitEl.disabled = !linkedContextSystemEl.value || !linkedContextExternalIdEl.value.trim();
 }
 
-function renderLinkedContextFilterControls() {
+function summarizeLinkedContextLookup(linkedQuery, visibleResults, searchQuery, activeFilter) {
+  const search = String(searchQuery ?? '').trim();
+  const count = visibleResults.length;
+  const ownerTypeCount = Math.max(linkedContextOwnerTypeFilters(visibleResults).length - 1, 0);
+  const activeLabel = activeFilter === 'all' ? 'all readable linked results' : linkedContextOwnerTypeLabel(activeFilter).toLowerCase();
+  const countLabel = `${count} readable linked result${count === 1 ? '' : 's'}`;
+
+  if (!search) {
+    return `${linkedQuery.system.toUpperCase()} ${linkedQuery.externalId} | ${countLabel}`;
+  }
+
+  if (count === 0) {
+    return `${linkedQuery.system.toUpperCase()} ${linkedQuery.externalId} | No readable linked results match "${search}" for ${activeLabel}.`;
+  }
+
+  if (activeFilter === 'all') {
+    return `${linkedQuery.system.toUpperCase()} ${linkedQuery.externalId} | Showing ${countLabel} matching "${search}" across ${ownerTypeCount} owner type${ownerTypeCount === 1 ? '' : 's'}.`;
+  }
+
+  return `${linkedQuery.system.toUpperCase()} ${linkedQuery.externalId} | Showing ${countLabel} matching "${search}" for ${activeLabel}.`;
+}
+
+function renderLinkedContextFilterControls(visibleResults = state.linkedContextResults) {
   const query = currentLinkedContextQuery();
   const activeFilter = currentLinkedContextOwnerTypeFilter();
-  const filterOptions = linkedContextOwnerTypeFilters(state.linkedContextResults)
+  const filterOptions = linkedContextOwnerTypeFilters(visibleResults)
     .filter((option) => option.value === 'all' || option.count > 0);
+  const activeOption = filterOptions.find((option) => option.value === activeFilter)
+    ?? (activeFilter === 'all'
+      ? filterOptions[0]
+      : {
+        value: activeFilter,
+        label: linkedContextOwnerTypeLabel(activeFilter),
+        count: 0
+      });
 
   linkedContextFilterControlsEl.innerHTML = '';
 
@@ -1208,12 +1259,22 @@ function renderLinkedContextFilterControls() {
     linkedContextFilterCopyEl.textContent = 'Owner-type grouping and filters unlock after you run a linked-context lookup.';
   }
   else {
-    linkedContextFilterCopyEl.textContent = summarizeLinkedContextFilter(state.linkedContextResults, activeFilter);
+    const search = currentLinkedContextSearchQuery().trim();
+    if (search) {
+      linkedContextFilterCopyEl.textContent = summarizeLinkedContextLookup(query, visibleResults, search, activeFilter);
+    }
+    else {
+      linkedContextFilterCopyEl.textContent = summarizeLinkedContextFilter(visibleResults, activeFilter);
+    }
   }
 
   const optionsToRender = filterOptions.length > 0
     ? filterOptions
     : [{ value: 'all', label: 'All readable', count: 0 }];
+
+  if (activeOption && !optionsToRender.some((option) => option.value === activeOption.value)) {
+    optionsToRender.push(activeOption);
+  }
 
   for (const option of optionsToRender) {
     const button = document.createElement('button');
@@ -1227,6 +1288,24 @@ function renderLinkedContextFilterControls() {
     });
     linkedContextFilterControlsEl.appendChild(button);
   }
+}
+
+function summarizeLinkedContextEmptyState(linkedQuery, visibleResults, searchQuery, activeFilter) {
+  const search = String(searchQuery ?? '').trim();
+  if (search) {
+    if (visibleResults.length === 0) {
+      if (activeFilter === 'all') {
+        return `No readable linked context matches "${search}". Clear the search to restore all owner types.`;
+      }
+      return `No readable linked context matches "${search}" for ${linkedContextOwnerTypeLabel(activeFilter).toLowerCase()}. Clear the search or switch owner types.`;
+    }
+
+    return `Search is currently narrowing the linked-context results for "${search}".`;
+  }
+
+  return linkedQuery
+    ? 'No readable NEXUS context is currently linked to that external item for this actor.'
+    : 'Choose a system and external ID to find linked NEXUS context.';
 }
 
 function coordinationCountsForMessage(messageId) {
@@ -1720,6 +1799,9 @@ function renderMessages() {
 function renderExternalReferences() {
   const message = currentMessage();
   const linkedQuery = currentLinkedContextQuery();
+  const searchQuery = currentLinkedContextSearchQuery();
+  const visibleLinkedContextResults = filteredLinkedContextResults();
+  const activeFilter = currentLinkedContextOwnerTypeFilter();
   scopeReferenceCopyEl.textContent = state.selectedScope
     ? `${currentScopeLabel()} | ${state.scopeExternalReferences.length} reference${state.scopeExternalReferences.length === 1 ? '' : 's'}`
     : 'Select a scope to load its references.';
@@ -1727,7 +1809,7 @@ function renderExternalReferences() {
     ? `${actorName(message.authorIdentityId)} | ${state.messageExternalReferences.length} reference${state.messageExternalReferences.length === 1 ? '' : 's'}`
     : 'Select a message to inspect message-level references.';
   linkedContextCopyEl.textContent = linkedQuery
-    ? `${linkedQuery.system.toUpperCase()} ${linkedQuery.externalId} | ${state.linkedContextResults.length} readable linked result${state.linkedContextResults.length === 1 ? '' : 's'}`
+    ? summarizeLinkedContextLookup(linkedQuery, visibleLinkedContextResults, searchQuery, activeFilter)
     : 'Run a read-only reverse lookup to find readable NEXUS context linked to an external item.';
 
   renderReferenceCards(
@@ -1770,13 +1852,11 @@ function renderExternalReferences() {
       }
     }
   );
-  renderLinkedContextFilterControls();
+  renderLinkedContextFilterControls(visibleLinkedContextResults);
   renderLinkedContextCards(
     linkedContextResultsEl,
-    state.linkedContextResults,
-    linkedQuery
-      ? 'No readable NEXUS context is currently linked to that external item for this actor.'
-      : 'Choose a system and external ID to find linked NEXUS context.'
+    visibleLinkedContextResults,
+    summarizeLinkedContextEmptyState(linkedQuery, visibleLinkedContextResults, searchQuery, activeFilter)
   );
   renderReferenceOwnerOptions();
   updateLinkedContextComposerState();
@@ -2740,6 +2820,11 @@ linkedContextFormEl.addEventListener('submit', async (event) => {
   }
 });
 
+linkedContextSearchEl.addEventListener('input', () => {
+  setLinkedContextSearchQuery(linkedContextSearchEl.value);
+  renderExternalReferences();
+});
+
 referenceComposerEl.addEventListener('submit', async (event) => {
   event.preventDefault();
   const owner = parseReferenceOwnerValue(referenceOwnerEl.value);
@@ -2907,6 +2992,7 @@ for (const relation of externalReferenceRelations) {
   referenceRelationEl.appendChild(option);
 }
 setLinkedContextQuery(null);
+setLinkedContextSearchQuery('');
 const initialRoute = parseSelectionRouteHash(window.location.hash);
 await loadIdentities();
 await loadWorkspaces();

@@ -5,6 +5,7 @@ import {
   buildLinkedContextSelection,
   groupLinkedContextResults,
   linkedContextOwnerTypeFilters,
+  linkedContextSearchResults,
   normalizeLinkedContextOwnerTypeFilter,
   summarizeLinkedContextCoordination,
   summarizeLinkedContextFilter,
@@ -181,6 +182,97 @@ test('groupLinkedContextResults narrows to the selected owner type and invalid f
   })), [
     { ownerType: 'post', markers: ['post-a', 'post-b'] }
   ]);
+});
+
+test('linked-context search matches readable text fields and composes with grouping and filters', () => {
+  const results = [
+    {
+      owner: { ownerType: 'channel', label: 'Alpha channel' },
+      reference: { title: 'Design draft', system: 'github', relationType: 'tracks', externalId: 'gh-1' },
+      route: { channelId: 'channel-alpha', postId: 'post-alpha' },
+      coordination: {
+        scope: { relayCount: 2, handoffCount: 1 },
+        message: null
+      }
+    },
+    {
+      owner: { ownerType: 'message', label: 'Beta message' },
+      reference: { summary: 'Status update ready', system: 'discord', relationType: 'relatesTo', externalId: 'msg-2' },
+      route: { messageId: 'message-2' }
+    },
+    {
+      owner: { ownerType: 'direct', label: 'Gamma direct' },
+      reference: { title: 'Misc note', externalId: 'dm-3' },
+      route: { directConversationId: 'direct-3' }
+    }
+  ];
+
+  assert.deepEqual(
+    linkedContextSearchResults(results, 'status update').map((result) => result.owner.label),
+    ['Beta message']
+  );
+
+  assert.deepEqual(
+    linkedContextSearchResults(results, 'post-alpha').map((result) => result.owner.label),
+    ['Alpha channel']
+  );
+
+  assert.deepEqual(
+    linkedContextSearchResults(results, '2 relays').map((result) => result.owner.label),
+    ['Alpha channel']
+  );
+
+  assert.equal(normalizeLinkedContextOwnerTypeFilter('channel', results, 'status update'), 'all');
+
+  const grouped = groupLinkedContextResults(results, 'channel', 'status update');
+  assert.deepEqual(grouped.map((group) => ({
+    ownerType: group.ownerType,
+    markers: group.results.map((result) => result.owner.label)
+  })), [
+    { ownerType: 'message', markers: ['Beta message'] }
+  ]);
+
+  assert.deepEqual(
+    linkedContextOwnerTypeFilters(results, 'status update'),
+    [
+      { value: 'all', count: 1, label: 'All readable' },
+      { value: 'message', count: 1, label: 'Messages' }
+    ]
+  );
+
+  assert.equal(
+    summarizeLinkedContextFilter(results, 'all', 'status update'),
+    'Showing all 1 readable linked result across 1 owner type.'
+  );
+});
+
+test('linked-context search matches route and coordination metadata', () => {
+  const results = [
+    {
+      owner: { ownerType: 'thread', label: 'Thread lane' },
+      route: {
+        channelId: 'channel-9',
+        threadId: 'thread-42',
+        messageId: 'message-99'
+      },
+      coordination: {
+        scope: {
+          relayCount: 7,
+          handoffCount: 3
+        }
+      }
+    }
+  ];
+
+  assert.deepEqual(
+    linkedContextSearchResults(results, 'thread-42').map((result) => result.owner.label),
+    ['Thread lane']
+  );
+
+  assert.deepEqual(
+    linkedContextSearchResults(results, '7 relays').map((result) => result.owner.label),
+    ['Thread lane']
+  );
 });
 
 test('summarizeLinkedContextFilter describes all-results and filtered views', () => {
