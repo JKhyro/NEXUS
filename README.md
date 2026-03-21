@@ -23,7 +23,7 @@ NEXUS is the in-house communications and coordination product that replaces Disc
 - `apps/service`
   Local NEXUS service with REST endpoints, bootstrap loading, CHATBASE/METABASE scaffolding, and adapter ingress.
 - `apps/desktop`
-  Desktop shell that manages the local service and loads the local web surface.
+  Desktop shell that manages the local service, logs managed-runtime failures, and loads the local web surface.
 - `apps/web`
   Browser-facing NEXUS client that uses the same service contract for channel browsing, direct conversations, forum posts, native threads, search, and composition.
 - `packages/contracts`
@@ -83,6 +83,16 @@ Relevant config keys:
   "allowedOrigins": ["https://nexus.example.invalid"]
 }
 ```
+
+## Desktop runtime behavior
+
+The desktop shell now treats the managed local NEXUS service as an explicit runtime with operator-visible diagnostics rather than a silent child process:
+
+- it verifies a usable Node.js binary before launch
+- it reuses an already-healthy local NEXUS service on the configured localhost port instead of blindly double-starting
+- it writes managed-service stdout and stderr to a runtime log under the desktop user-data path
+- it surfaces launch and readiness failures through the desktop shell with a stable error code and log-path context
+- it stops owned managed-service children cleanly on app quit
 
 ## Current client surface
 
