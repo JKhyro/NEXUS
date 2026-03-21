@@ -96,7 +96,7 @@ The current desktop/web client can:
 - browse imported and newly created attachment metadata inline with messages
 - create forum posts and ordinary messages with inline attachment metadata through the same service contract
 - browse and create external references on scopes and selected messages for ANVIL, GitHub, or Discord-linked context
-- run a read-only reverse lookup for an ANVIL, GitHub, or Discord external item, group and filter readable results by owner type, see scope/message coordination summaries for each readable result, and jump directly into each linked NEXUS channel, post, thread, direct conversation, or message
+- run a read-only reverse lookup for an ANVIL, GitHub, or Discord external item, search the already-loaded readable results, group and filter them by owner type, see scope/message coordination summaries for each readable result, and jump directly into each linked NEXUS channel, post, thread, direct conversation, or message
 - inspect and create relay and handoff records for the current scope, switch the coordination rail into a selected-message focus when needed, jump back to related messages when coordination records carry `messageId`, and see message-level coordination badges directly in the conversation view
 - keep the URL in sync with the current actor, workspace, scope, and selected-message context so operators can deep-link directly back into readable NEXUS state
 - copy a readable link to the current scope or the currently selected message directly from the client surface

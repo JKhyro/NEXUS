@@ -722,6 +722,14 @@ button:disabled {
   background: rgba(255, 255, 255, 0.78);
 }
 
+.linked-context-search-field {
+  gap: 6px;
+}
+
+.linked-context-search-field span {
+  font-size: 0.86rem;
+}
+
 .linked-context-filter-copy {
   line-height: 1.45;
 }
