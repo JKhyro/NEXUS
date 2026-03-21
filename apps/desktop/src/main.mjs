@@ -1,56 +1,48 @@
-import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdir } from 'node:fs/promises';
 
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
+
+import {
+  createManagedServiceController,
+  formatManagedServiceFailure
+} from './service-runtime.mjs';
 
 const desktopDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(desktopDir, '..', '..', '..');
 const serviceEntrypoint = join(repoRoot, 'apps', 'service', 'src', 'server.mjs');
 const serviceHost = '127.0.0.1';
 const servicePort = '43100';
-let serviceProcess = null;
+let mainWindow = null;
+let shutdownRequested = false;
+let shutdownPromise = null;
 
-async function waitForService(url) {
-  const deadline = Date.now() + 15000;
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(`${url}/api/health`);
-      if (response.ok) {
-        return;
-      }
-    }
-    catch {
-      // Wait for the service process to come up.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 300));
-  }
-  throw new Error('Timed out waiting for the local NEXUS service.');
-}
+const managedService = createManagedServiceController({
+  getUserDataPath: () => app.getPath('userData'),
+  repoRoot,
+  serviceEntrypoint,
+  serviceHost,
+  servicePort
+});
 
-async function startManagedService() {
-  const runtimeDir = join(app.getPath('userData'), 'runtime');
-  await mkdir(runtimeDir, { recursive: true });
-  serviceProcess = spawn('node', [serviceEntrypoint], {
-    cwd: repoRoot,
-    env: {
-      ...process.env,
-      NEXUS_DEPLOYMENT_MODE: 'local-managed',
-      NEXUS_HOST: serviceHost,
-      NEXUS_PORT: servicePort,
-      NEXUS_STATIC_MODE: 'embedded',
-      NEXUS_DATA_DIR: runtimeDir
-    },
-    stdio: 'ignore'
-  });
-
-  serviceProcess.unref();
-  await waitForService(`http://${serviceHost}:${servicePort}`);
+function showStartupFailure(error) {
+  console.error(error);
+  dialog.showErrorBox(
+    'NEXUS startup failed',
+    formatManagedServiceFailure(error, managedService.getLastLaunchFailure())
+  );
 }
 
 async function createMainWindow() {
-  await startManagedService();
+  const service = await managedService.ensureStarted();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    mainWindow.focus();
+    return mainWindow;
+  }
+
   const window = new BrowserWindow({
     width: 1480,
     height: 980,
@@ -60,19 +52,59 @@ async function createMainWindow() {
       sandbox: true
     }
   });
+  mainWindow = window;
+  window.on('closed', () => {
+    if (mainWindow === window) {
+      mainWindow = null;
+    }
+  });
 
-  await window.loadURL(`http://${serviceHost}:${servicePort}/`);
+  await window.loadURL(service.url);
+  return window;
+}
+
+async function shutdownApp(exitCode = 0) {
+  if (shutdownPromise) {
+    return shutdownPromise;
+  }
+
+  shutdownPromise = (async () => {
+    try {
+      await managedService.stop();
+    }
+    catch (error) {
+      console.error(error);
+    }
+    finally {
+      app.exit(exitCode);
+    }
+  })();
+
+  return shutdownPromise;
 }
 
 app.whenReady().then(() => {
   createMainWindow().catch((error) => {
-    console.error(error);
-    app.quit();
+    showStartupFailure(error);
+    shutdownApp(1);
+  });
+  app.on('activate', () => {
+    createMainWindow().catch(showStartupFailure);
   });
 });
 
-app.on('before-quit', () => {
-  if (serviceProcess && !serviceProcess.killed) {
-    serviceProcess.kill();
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
   }
+});
+
+app.on('before-quit', (event) => {
+  if (shutdownRequested) {
+    return;
+  }
+
+  shutdownRequested = true;
+  event.preventDefault();
+  shutdownApp(process.exitCode ?? 0);
 });
