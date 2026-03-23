@@ -23,7 +23,7 @@ NEXUS is the in-house communications and coordination product that replaces Disc
 - `apps/service`
   Local NEXUS service with REST endpoints, bootstrap loading, CHATBASE/METABASE scaffolding, and adapter ingress.
 - `apps/desktop`
-  Desktop shell that manages the local service, logs managed-runtime failures, and loads the local web surface.
+  Electron desktop shell that manages the local service, logs managed-runtime failures, and loads the local web surface.
 - `apps/web`
   Browser-facing NEXUS client that uses the same service contract for channel browsing, direct conversations, forum posts, native threads, search, and composition.
 - `packages/contracts`
@@ -41,6 +41,12 @@ npm run import:chatbase
 npm run desktop:start
 npm test
 ```
+
+## Current desktop implementation
+
+The current desktop implementation in this repo is the Electron-managed shell in `apps/desktop` backed by the Node service in `apps/service`.
+
+This repo does not currently contain an Avalonia desktop client. Any future native-desktop or Avalonia transition would be a new implementation decision rather than the current repo baseline.
 
 ## Storage modes
 
@@ -116,6 +122,14 @@ The current desktop/web client can:
 - search visible history and jump into matching channel, post, thread, or direct scopes
 
 For normal local use, copy [config/nexus.local.example.json](config/nexus.local.example.json) to `config/nexus.local.json` and fill in the real LIBRARY connection details. The service and desktop shell will pick that file up automatically.
+
+If local `library-postgres` credentials are not valid yet, switch to JSON bootstrap mode for isolated local runs instead of treating a failed desktop launch as an application-surface bug:
+
+```json
+{
+  "storageMode": "json"
+}
+```
 
 ## CHATBASE import
 
