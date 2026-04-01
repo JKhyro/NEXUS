@@ -48,6 +48,17 @@ The current desktop implementation in this repo is the Electron-managed shell in
 
 This repo does not currently contain an Avalonia desktop client. Any future native-desktop or Avalonia transition would be a new implementation decision rather than the current repo baseline.
 
+## Approved target desktop direction
+
+The April 1, 2026 direction for future NEXUS desktop work is:
+
+- native-C-first runtime and interop surfaces
+- Avalonia as the desktop UI host where a managed shell is still useful
+- native C interop as the preferred boundary between the UI host and native runtime components
+- C# only where necessary for Avalonia hosting, glue code, or thin orchestration layers
+
+That means Electron and the current Node-managed desktop shell should be treated as the continuity baseline already present in repo, not the intended long-term desktop stack.
+
 ## Storage modes
 
 The service now supports two persistence modes behind the same contract:
