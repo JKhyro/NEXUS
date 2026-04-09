@@ -1608,6 +1608,19 @@ function summarizeLastRuntimeCommand(health) {
   return `${lastCommand.commandType} at ${formatTimestamp(lastCommand.completedAt ?? lastCommand.dispatchedAt)}`;
 }
 
+function summarizeRuntimeCrashCount(health) {
+  return String(health?.runtime?.crashCount ?? 0);
+}
+
+function summarizeLastRuntimeCrash(health) {
+  const lastCrash = health?.runtime?.lastCrash ?? null;
+  if (!lastCrash?.slotId) {
+    return 'No runtime helper crash recorded yet';
+  }
+
+  return `${lastCrash.slotId} ${lastCrash.recoveryAction ?? 'reported'} at ${formatTimestamp(lastCrash.crashedAt)}`;
+}
+
 function currentRouteActivationRequest() {
   const directConversation = currentDirectConversation();
   if (directConversation) {
@@ -1919,6 +1932,14 @@ function renderHealth() {
       <div class="service-health-metric service-health-metric-wide">
         <span class="eyebrow">Last command</span>
         <strong>${escapeHtml(summarizeLastRuntimeCommand(state.health))}</strong>
+      </div>
+      <div class="service-health-metric">
+        <span class="eyebrow">Crashes</span>
+        <strong>${escapeHtml(summarizeRuntimeCrashCount(state.health))}</strong>
+      </div>
+      <div class="service-health-metric service-health-metric-wide">
+        <span class="eyebrow">Last crash</span>
+        <strong>${escapeHtml(summarizeLastRuntimeCrash(state.health))}</strong>
       </div>
       <div class="service-health-metric service-health-metric-wide">
         <span class="eyebrow">Supervisor event</span>

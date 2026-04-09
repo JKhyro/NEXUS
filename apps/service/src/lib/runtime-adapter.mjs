@@ -26,8 +26,11 @@ function createRuntimeHealthSnapshot(config, runtimeState, store, supervisorStat
       lastActivatedAt: supervisorStatus.lastActivatedAt,
       lastReleasedAt: supervisorStatus.lastReleasedAt,
       lastCommandAt: supervisorStatus.lastCommandAt,
+      lastCrashAt: supervisorStatus.lastCrashAt,
       commandDispatchCount: supervisorStatus.commandDispatchCount,
+      crashCount: supervisorStatus.crashCount,
       lastCommand: supervisorStatus.lastCommand,
+      lastCrash: supervisorStatus.lastCrash,
       activeRouteActivationCount: supervisorStatus.activeRouteActivationCount,
       activeRouteActivations: supervisorStatus.activeRouteActivations,
       manifestRegistry: supervisorStatus.manifestRegistry,
@@ -49,6 +52,16 @@ function createRuntimeSupervisorNotReadyError(supervisorStatus) {
 function createRuntimeCommandActivationIdError() {
   const error = new Error('Runtime command dispatch requires a non-empty activationId.');
   error.code = 'runtime-command-invalid';
+  error.statusCode = 400;
+  error.details = {
+    field: 'activationId'
+  };
+  return error;
+}
+
+function createRuntimeCrashActivationIdError() {
+  const error = new Error('Runtime helper crash reporting requires a non-empty activationId.');
+  error.code = 'runtime-helper-crash-invalid';
   error.statusCode = 400;
   error.details = {
     field: 'activationId'
@@ -92,6 +105,9 @@ export function createInProcessRuntimeAdapter({
     listRouteActivations() {
       return runtimeSupervisor.listRouteActivations();
     },
+    listRuntimeEvents() {
+      return runtimeSupervisor.listEvents();
+    },
     async dispatchRouteCommand(activationId, commandEnvelope) {
       if (!runtimeSupervisor.isReady()) {
         throw createRuntimeSupervisorNotReadyError(runtimeSupervisor.getStatus());
@@ -108,6 +124,15 @@ export function createInProcessRuntimeAdapter({
         surfaceKind: activation.surface.surfaceKind,
         echoedPayload: command.payload
       }));
+    },
+    reportRouteHelperCrash(activationId, crashEnvelope) {
+      if (!runtimeSupervisor.isReady()) {
+        throw createRuntimeSupervisorNotReadyError(runtimeSupervisor.getStatus());
+      }
+      if (typeof activationId !== 'string' || activationId.trim().length === 0) {
+        throw createRuntimeCrashActivationIdError();
+      }
+      return runtimeSupervisor.reportHelperCrash(activationId, crashEnvelope);
     },
     releaseRouteActivation(activationId) {
       return runtimeSupervisor.releaseRouteActivation(activationId);

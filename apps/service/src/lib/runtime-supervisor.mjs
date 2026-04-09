@@ -29,6 +29,17 @@ function normalizeCommandFailure(error, at, commandType) {
   };
 }
 
+function normalizeHelperCrashFailure(error, at, activationId, slotId, helperPackageId) {
+  return {
+    at,
+    activationId,
+    slotId,
+    helperPackageId,
+    code: typeof error?.code === 'string' ? error.code : 'runtime-helper-crash',
+    message: error?.message ?? `Helper slot ${slotId} crashed.`
+  };
+}
+
 function createCommandValidationError(message, details = null) {
   const error = new Error(message);
   error.code = 'runtime-command-invalid';
@@ -54,7 +65,14 @@ function summarizeHelperSlot(slot) {
     slotId: slot.slotId,
     status: slot.status,
     helperPackageId: slot.helper?.packageId ?? null,
-    sourceRuntime: slot.helper?.sourceRuntime ?? null
+    sourceRuntime: slot.helper?.sourceRuntime ?? null,
+    restartCount: 0,
+    restartWindowStartedAt: null,
+    restartWindowCount: 0,
+    lastCrashAt: null,
+    lastRestartedAt: null,
+    lastFailure: null,
+    failurePolicy: slot.helper?.failurePolicy ?? null
   };
 }
 
@@ -65,6 +83,36 @@ function summarizeDiagnostic(diagnostic) {
     slotId: diagnostic.slotId ?? null,
     helperPackageId: diagnostic.helperPackageId ?? null,
     message: diagnostic.message ?? 'Runtime activation diagnostic.'
+  };
+}
+
+function ensureHelperCrashEnvelope(crashEnvelope) {
+  if (!crashEnvelope || typeof crashEnvelope !== 'object' || Array.isArray(crashEnvelope)) {
+    throw createCommandValidationError('Runtime helper crash reporting requires a JSON object payload.');
+  }
+
+  if (typeof crashEnvelope.slotId !== 'string' || crashEnvelope.slotId.trim().length === 0) {
+    throw createCommandValidationError('Runtime helper crash field slotId must be a non-empty string.', {
+      field: 'slotId'
+    });
+  }
+
+  if (crashEnvelope.code !== undefined && (typeof crashEnvelope.code !== 'string' || crashEnvelope.code.trim().length === 0)) {
+    throw createCommandValidationError('Runtime helper crash field code must be omitted or be a non-empty string.', {
+      field: 'code'
+    });
+  }
+
+  if (crashEnvelope.message !== undefined && (typeof crashEnvelope.message !== 'string' || crashEnvelope.message.trim().length === 0)) {
+    throw createCommandValidationError('Runtime helper crash field message must be omitted or be a non-empty string.', {
+      field: 'message'
+    });
+  }
+
+  return {
+    slotId: crashEnvelope.slotId.trim(),
+    code: typeof crashEnvelope.code === 'string' ? crashEnvelope.code.trim() : 'runtime-helper-crash',
+    message: typeof crashEnvelope.message === 'string' ? crashEnvelope.message.trim() : 'Synthetic helper crash report.'
   };
 }
 
@@ -172,12 +220,51 @@ function createCommandRecord(commandEnvelope, activationRecord, commandResult, d
   };
 }
 
+function createHelperCrashDiagnostic(slotId, helperPackageId, failure) {
+  return {
+    level: 'warning',
+    code: 'helper-crash-isolated',
+    slotId,
+    helperPackageId,
+    message: `${failure.code}: ${failure.message}`
+  };
+}
+
+function upsertActivationDiagnostic(diagnostics, nextDiagnostic) {
+  return [
+    ...diagnostics.filter((diagnostic) => !(diagnostic.slotId === nextDiagnostic.slotId && diagnostic.code === nextDiagnostic.code)),
+    nextDiagnostic
+  ];
+}
+
 function createActivationNotFoundError(activationId) {
   const error = new Error(`Runtime activation ${activationId} is not active.`);
   error.code = 'runtime-activation-not-found';
   error.statusCode = 404;
   error.details = {
     activationId
+  };
+  return error;
+}
+
+function createHelperSlotNotFoundError(activationId, slotId) {
+  const error = new Error(`Runtime helper slot ${slotId} is not active for activation ${activationId}.`);
+  error.code = 'runtime-helper-slot-not-found';
+  error.statusCode = 404;
+  error.details = {
+    activationId,
+    slotId
+  };
+  return error;
+}
+
+function createHelperSlotNotBoundError(activationId, slotId) {
+  const error = new Error(`Runtime helper slot ${slotId} is not bound for activation ${activationId}.`);
+  error.code = 'runtime-helper-slot-not-bound';
+  error.statusCode = 409;
+  error.details = {
+    activationId,
+    slotId
   };
   return error;
 }
@@ -201,8 +288,11 @@ export function createRuntimeSupervisor({
     lastActivatedAt: null,
     lastReleasedAt: null,
     lastCommandAt: null,
+    lastCrashAt: null,
     commandDispatchCount: 0,
+    crashCount: 0,
     lastCommand: null,
+    lastCrash: null,
     manifestRegistry: null,
     activeRouteActivations: [],
     lastFailure: null,
@@ -235,12 +325,25 @@ export function createRuntimeSupervisor({
       lastActivatedAt: state.lastActivatedAt,
       lastReleasedAt: state.lastReleasedAt,
       lastCommandAt: state.lastCommandAt,
+      lastCrashAt: state.lastCrashAt,
       commandDispatchCount: state.commandDispatchCount,
+      crashCount: state.crashCount,
       lastCommand: state.lastCommand ? {
         ...state.lastCommand,
         result: state.lastCommand.result && typeof state.lastCommand.result === 'object'
           ? { ...state.lastCommand.result }
           : state.lastCommand.result
+      } : null,
+      lastCrash: state.lastCrash ? {
+        ...state.lastCrash,
+        failure: state.lastCrash.failure ? { ...state.lastCrash.failure } : null,
+        helperSlot: state.lastCrash.helperSlot ? {
+          ...state.lastCrash.helperSlot,
+          failurePolicy: state.lastCrash.helperSlot.failurePolicy
+            ? { ...state.lastCrash.helperSlot.failurePolicy }
+            : null,
+          lastFailure: state.lastCrash.helperSlot.lastFailure ? { ...state.lastCrash.helperSlot.lastFailure } : null
+        } : null
       } : null,
       manifestRegistry: state.manifestRegistry,
       activeRouteActivationCount: state.activeRouteActivations.length,
@@ -255,7 +358,11 @@ export function createRuntimeSupervisor({
             : activation.lastCommand.result
         } : null,
         lastCommandFailure: activation.lastCommandFailure ? { ...activation.lastCommandFailure } : null,
-        helperSlots: activation.helperSlots.map((slot) => ({ ...slot })),
+        helperSlots: activation.helperSlots.map((slot) => ({
+          ...slot,
+          failurePolicy: slot.failurePolicy ? { ...slot.failurePolicy } : null,
+          lastFailure: slot.lastFailure ? { ...slot.lastFailure } : null
+        })),
         diagnostics: activation.diagnostics.map((diagnostic) => ({ ...diagnostic }))
       })),
       lastFailure: state.lastFailure,
@@ -414,6 +521,132 @@ export function createRuntimeSupervisor({
     },
     listRouteActivations() {
       return getStatus().activeRouteActivations;
+    },
+    listEvents() {
+      return getStatus().recentEvents;
+    },
+    reportHelperCrash(activationId, crashEnvelope) {
+      const recordIndex = state.activeRouteActivations.findIndex((entry) => entry.activationId === activationId);
+      if (recordIndex === -1) {
+        throw createActivationNotFoundError(activationId);
+      }
+
+      const activation = state.activeRouteActivations[recordIndex];
+      const normalizedCrash = ensureHelperCrashEnvelope(crashEnvelope);
+      const slotIndex = activation.helperSlots.findIndex((slot) => slot.slotId === normalizedCrash.slotId);
+      if (slotIndex === -1) {
+        throw createHelperSlotNotFoundError(activationId, normalizedCrash.slotId);
+      }
+
+      const slot = activation.helperSlots[slotIndex];
+      if (!slot.helperPackageId) {
+        throw createHelperSlotNotBoundError(activationId, normalizedCrash.slotId);
+      }
+
+      const crashedAt = timestamp(now);
+      const failure = normalizeHelperCrashFailure(
+        normalizedCrash,
+        crashedAt,
+        activationId,
+        slot.slotId,
+        slot.helperPackageId
+      );
+      slot.lastCrashAt = crashedAt;
+      slot.lastFailure = failure;
+      state.lastCrashAt = crashedAt;
+      state.crashCount += 1;
+
+      recordEvent('helper-crash-reported', {
+        activationId,
+        slotId: slot.slotId,
+        helperPackageId: slot.helperPackageId,
+        code: failure.code
+      });
+
+      const failurePolicy = slot.failurePolicy ?? {};
+      const maxRestartsPerHour = Number(failurePolicy.maxRestartsPerHour ?? 0);
+      const restartBudgetStartedAt = slot.restartWindowStartedAt
+        ? Date.parse(slot.restartWindowStartedAt)
+        : Number.NaN;
+      const crashedAtValue = Date.parse(crashedAt);
+      if (!slot.restartWindowStartedAt || Number.isNaN(restartBudgetStartedAt) || Number.isNaN(crashedAtValue) || (crashedAtValue - restartBudgetStartedAt) >= 3_600_000) {
+        slot.restartWindowStartedAt = crashedAt;
+        slot.restartWindowCount = 0;
+      }
+
+      if (failurePolicy.onCrash === 'restartable' && slot.restartWindowCount < maxRestartsPerHour) {
+        slot.status = 'restarting';
+        recordEvent('helper-restart-scheduled', {
+          activationId,
+          slotId: slot.slotId,
+          helperPackageId: slot.helperPackageId,
+          nextRestartCount: slot.restartCount + 1
+        });
+        slot.restartCount += 1;
+        slot.restartWindowCount += 1;
+        slot.lastRestartedAt = timestamp(now);
+        slot.status = 'bound';
+        activation.diagnostics = activation.diagnostics.filter((diagnostic) => !(diagnostic.slotId === slot.slotId && diagnostic.code === 'helper-crash-isolated'));
+        state.lastCrash = {
+          activationId,
+          slotId: slot.slotId,
+          helperPackageId: slot.helperPackageId,
+          crashedAt,
+          recoveryAction: 'restarted',
+          failure,
+          helperSlot: {
+            ...slot,
+            failurePolicy: slot.failurePolicy ? { ...slot.failurePolicy } : null,
+            lastFailure: slot.lastFailure ? { ...slot.lastFailure } : null
+          }
+        };
+        recordEvent('helper-restarted', {
+          activationId,
+          slotId: slot.slotId,
+          helperPackageId: slot.helperPackageId,
+          restartCount: slot.restartCount
+        });
+      }
+      else {
+        slot.status = 'degraded';
+        activation.diagnostics = upsertActivationDiagnostic(
+          activation.diagnostics,
+          createHelperCrashDiagnostic(slot.slotId, slot.helperPackageId, failure)
+        );
+        state.lastCrash = {
+          activationId,
+          slotId: slot.slotId,
+          helperPackageId: slot.helperPackageId,
+          crashedAt,
+          recoveryAction: 'degraded',
+          failure,
+          helperSlot: {
+            ...slot,
+            failurePolicy: slot.failurePolicy ? { ...slot.failurePolicy } : null,
+            lastFailure: slot.lastFailure ? { ...slot.lastFailure } : null
+          }
+        };
+        recordEvent('helper-crash-isolated', {
+          activationId,
+          slotId: slot.slotId,
+          helperPackageId: slot.helperPackageId,
+          code: failure.code
+        });
+      }
+
+      return {
+        activationId,
+        slotId: slot.slotId,
+        helperPackageId: slot.helperPackageId,
+        crashedAt,
+        recoveryAction: state.lastCrash.recoveryAction,
+        failure,
+        helperSlot: {
+          ...slot,
+          failurePolicy: slot.failurePolicy ? { ...slot.failurePolicy } : null,
+          lastFailure: slot.lastFailure ? { ...slot.lastFailure } : null
+        }
+      };
     },
     releaseRouteActivation(activationId) {
       const recordIndex = state.activeRouteActivations.findIndex((entry) => entry.activationId === activationId);

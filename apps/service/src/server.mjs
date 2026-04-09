@@ -216,6 +216,10 @@ async function routeApi(request, response, runtimeAdapter, config) {
     return sendJson(request, response, config, 200, runtimeAdapter.listRouteActivations());
   }
 
+  if (request.method === 'GET' && url.pathname === '/api/runtime/events') {
+    return sendJson(request, response, config, 200, runtimeAdapter.listRuntimeEvents());
+  }
+
   if (request.method === 'POST' && url.pathname === '/api/runtime/route-activations/commands') {
     const commandEnvelope = await readBody(request);
     return sendJson(
@@ -224,6 +228,17 @@ async function routeApi(request, response, runtimeAdapter, config) {
       config,
       200,
       await runtimeAdapter.dispatchRouteCommand(commandEnvelope.activationId, commandEnvelope)
+    );
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/runtime/route-activations/helper-crashes') {
+    const crashEnvelope = await readBody(request);
+    return sendJson(
+      request,
+      response,
+      config,
+      200,
+      runtimeAdapter.reportRouteHelperCrash(crashEnvelope.activationId, crashEnvelope)
     );
   }
 
