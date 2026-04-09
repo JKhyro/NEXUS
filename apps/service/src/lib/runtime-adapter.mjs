@@ -1,3 +1,5 @@
+import { createRuntimeManifestRegistry } from './runtime-manifest-registry.mjs';
+
 function createRuntimeHealthSnapshot(config, runtimeState, store) {
   return {
     status: 'ok',
@@ -18,12 +20,14 @@ function createRuntimeHealthSnapshot(config, runtimeState, store) {
       transitionSeam: runtimeState.transitionSeam,
       backingImplementation: runtimeState.backingImplementation,
       lifecycleState: runtimeState.lifecycleState,
-      startedAt: runtimeState.startedAt
+      startedAt: runtimeState.startedAt,
+      manifestRegistry: runtimeState.manifestRegistry
     }
   };
 }
 
 export function createInProcessRuntimeAdapter({ config, store, contractVersion }) {
+  const manifestRegistry = createRuntimeManifestRegistry({ repoRoot: config.repoRoot });
   const runtimeState = {
     owner: 'node-transition-adapter',
     targetOwner: 'native-runtime-core',
@@ -31,12 +35,14 @@ export function createInProcessRuntimeAdapter({ config, store, contractVersion }
     backingImplementation: 'in-process-store',
     lifecycleState: 'created',
     startedAt: null,
+    manifestRegistry: null,
     contractVersion
   };
 
   return {
     store,
     async start() {
+      runtimeState.manifestRegistry = await manifestRegistry.getSummary();
       runtimeState.lifecycleState = 'running';
       runtimeState.startedAt = new Date().toISOString();
     },
@@ -46,6 +52,9 @@ export function createInProcessRuntimeAdapter({ config, store, contractVersion }
     },
     getHealthSnapshot() {
       return createRuntimeHealthSnapshot(config, runtimeState, store);
+    },
+    async activateRoute(routeEnvelope) {
+      return manifestRegistry.activateRoute(routeEnvelope);
     },
     getBootstrapSummary() {
       return store.getBootstrapSummary();

@@ -208,6 +208,10 @@ async function routeApi(request, response, runtimeAdapter, config) {
     return sendJson(request, response, config, 201, await runtimeAdapter.createHandoff(await readBody(request)));
   }
 
+  if (request.method === 'POST' && url.pathname === '/api/runtime/route-activations') {
+    return sendJson(request, response, config, 200, await runtimeAdapter.activateRoute(await readBody(request)));
+  }
+
   if (request.method === 'POST' && url.pathname === '/api/adapters/discord/events') {
     return sendJson(request, response, config, 201, await runtimeAdapter.ingestDiscordEvent(await readBody(request)));
   }
@@ -241,7 +245,21 @@ export async function createNexusService(overrides = {}) {
       await serveStatic(request, config.staticDir, new URL(request.url, `http://${config.host}:${config.port}`).pathname, response, config);
     }
     catch (error) {
-      sendJson(request, response, config, 500, { error: error.message });
+      const payload = { error: error.message };
+      if (typeof error.code === 'string') {
+        payload.code = error.code;
+      }
+      if (error.details && typeof error.details === 'object') {
+        payload.details = error.details;
+      }
+
+      sendJson(
+        request,
+        response,
+        config,
+        Number.isInteger(error.statusCode) ? error.statusCode : 500,
+        payload
+      );
     }
   });
 

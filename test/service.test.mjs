@@ -29,6 +29,8 @@ test('service boots and exposes the seeded internal channel map', async () => {
     assert.equal(health.runtime.transitionSeam, 'service-runtime-boundary');
     assert.equal(health.runtime.backingImplementation, 'in-process-store');
     assert.equal(health.runtime.lifecycleState, 'running');
+    assert.equal(health.runtime.manifestRegistry.surfacePackageCount, 1);
+    assert.equal(health.runtime.manifestRegistry.helperPackageCount, 1);
 
     const workspaces = await fetch(`${service.url}/api/workspaces?actorId=identity-jack`).then((response) => response.json());
     assert.equal(workspaces.length, 1);
@@ -41,6 +43,125 @@ test('service boots and exposes the seeded internal channel map', async () => {
     assert(slugs.has('digest-agent'));
     assert(slugs.has('hera'));
     assert(slugs.has('librarian'));
+  });
+});
+
+test('route activation resolves a manifest-backed thread surface and compatible helper slot', async () => {
+  await withService(async (service) => {
+    const activationResponse = await fetch(`${service.url}/api/runtime/route-activations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        workspaceId: 'workspace-internal-core',
+        surfaceKind: 'thread',
+        scopeId: 'thread-roadmap-71',
+        selectedMessageId: 'msg-001',
+        surfacePackageId: 'nexus.surface.thread',
+        routeCapabilities: [
+          'conversation.read',
+          'message.compose',
+          'coordination.focus'
+        ],
+        helperSlotRequests: [
+          {
+            slotId: 'thread-sidebar',
+            preferredHelperPackageId: 'symbiosis.helper.review'
+          }
+        ]
+      })
+    });
+    const activation = await activationResponse.json();
+
+    assert.equal(activationResponse.status, 200);
+    assert.match(activation.activationId, /^route-activation-/);
+    assert.equal(activation.route.surfaceKind, 'thread');
+    assert.equal(activation.route.scopeId, 'thread-roadmap-71');
+    assert.equal(activation.surface.packageId, 'nexus.surface.thread');
+    assert.deepEqual(activation.route.grantedCapabilities, [
+      'conversation.read',
+      'message.compose',
+      'coordination.focus'
+    ]);
+    assert.equal(activation.helperSlots.length, 1);
+    assert.equal(activation.helperSlots[0].slotId, 'thread-sidebar');
+    assert.equal(activation.helperSlots[0].status, 'bound');
+    assert.equal(activation.helperSlots[0].helper.packageId, 'symbiosis.helper.review');
+    assert.equal(activation.helperSlots[0].helper.sourceRuntime, 'SYMBIOSIS');
+    assert.deepEqual(activation.helperSlots[0].helper.capabilities, [
+      'message.inspect',
+      'coordination.suggest'
+    ]);
+    assert.deepEqual(activation.diagnostics, []);
+  });
+});
+
+test('route activation degrades an incompatible helper slot without failing the route', async () => {
+  await withService(async (service) => {
+    const activationResponse = await fetch(`${service.url}/api/runtime/route-activations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        workspaceId: 'workspace-internal-core',
+        surfaceKind: 'thread',
+        scopeId: 'thread-roadmap-71',
+        surfacePackageId: 'nexus.surface.thread',
+        routeCapabilities: [
+          'conversation.read'
+        ],
+        helperSlotRequests: [
+          {
+            slotId: 'thread-sidebar',
+            preferredHelperPackageId: 'symbiosis.helper.unknown'
+          },
+          {
+            slotId: 'thread-inline',
+            preferredHelperPackageId: 'symbiosis.helper.review'
+          }
+        ]
+      })
+    });
+    const activation = await activationResponse.json();
+
+    assert.equal(activationResponse.status, 200);
+    assert.equal(activation.helperSlots.length, 2);
+    assert.equal(activation.helperSlots[0].status, 'degraded');
+    assert.equal(activation.helperSlots[0].helper, null);
+    assert.equal(activation.helperSlots[0].diagnostics[0].code, 'helper-package-not-found');
+    assert.equal(activation.helperSlots[1].status, 'degraded');
+    assert.equal(activation.helperSlots[1].diagnostics[0].code, 'slot-not-declared');
+    assert.equal(activation.diagnostics.length, 2);
+    assert.deepEqual(
+      activation.diagnostics.map((entry) => entry.code),
+      ['helper-package-not-found', 'slot-not-declared']
+    );
+  });
+});
+
+test('route activation rejects route capabilities not approved by the selected surface package', async () => {
+  await withService(async (service) => {
+    const activationResponse = await fetch(`${service.url}/api/runtime/route-activations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        workspaceId: 'workspace-internal-core',
+        surfaceKind: 'thread',
+        scopeId: 'thread-roadmap-71',
+        surfacePackageId: 'nexus.surface.thread',
+        routeCapabilities: [
+          'conversation.read',
+          'runtime.admin'
+        ],
+        helperSlotRequests: []
+      })
+    });
+    const body = await activationResponse.json();
+
+    assert.equal(activationResponse.status, 400);
+    assert.equal(body.code, 'route-capability-not-approved');
+    assert.equal(body.details.capability, 'runtime.admin');
   });
 });
 
