@@ -44,12 +44,16 @@ test('service boots and exposes the seeded internal channel map', async () => {
     assert.equal(health.runtime.readiness, 'ready');
     assert.equal(health.runtime.backingImplementation, 'in-process-store');
     assert.equal(health.runtime.lifecycleState, 'running');
+    assert.equal(health.runtime.lastLifecycleRequestAt, null);
     assert.equal(health.runtime.lastCommandAt, null);
     assert.equal(health.runtime.lastCrashAt, null);
     assert.equal(health.runtime.commandDispatchCount, 0);
     assert.equal(health.runtime.crashCount, 0);
+    assert.equal(health.runtime.lifecycleRequestCount, 0);
+    assert.equal(health.runtime.acceptingRouteActivations, true);
     assert.equal(health.runtime.lastCommand, null);
     assert.equal(health.runtime.lastCrash, null);
+    assert.equal(health.runtime.lastLifecycleRequest, null);
     assert.equal(health.runtime.activeRouteActivationCount, 0);
     assert.deepEqual(health.runtime.activeRouteActivations, []);
     assert.equal(health.runtime.manifestRegistry.surfacePackageCount, 4);
@@ -546,6 +550,61 @@ test('runtime helper crash degrades a slot once the restart budget is exhausted'
   });
 });
 
+test('runtime lifecycle requests are retained as supervisor-owned state and emit lifecycle events', async () => {
+  await withService(async (service) => {
+    const drainResponse = await fetch(`${service.url}/api/runtime/lifecycle-requests`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requestType: 'drain',
+        reason: 'operator-maintenance-window'
+      })
+    });
+    const drain = await drainResponse.json();
+
+    assert.equal(drainResponse.status, 200);
+    assert.match(drain.requestId, /^runtime-lifecycle-request-/);
+    assert.equal(drain.requestType, 'drain');
+    assert.equal(drain.reason, 'operator-maintenance-window');
+    assert.equal(drain.previousLifecycleState, 'running');
+    assert.equal(drain.nextLifecycleState, 'draining');
+    assert.equal(drain.dispatchOwner, 'node-runtime-supervisor');
+    assert.equal(drain.targetOwner, 'native-runtime-supervisor');
+
+    const healthWhileDraining = await fetch(`${service.url}/api/health`).then((response) => response.json());
+    assert.equal(healthWhileDraining.runtime.lifecycleState, 'draining');
+    assert.equal(healthWhileDraining.runtime.lifecycleRequestCount, 1);
+    assert.equal(healthWhileDraining.runtime.acceptingRouteActivations, false);
+    assert.equal(healthWhileDraining.runtime.lastLifecycleRequest.requestId, drain.requestId);
+    assert(healthWhileDraining.runtime.supervisor.recentEvents.some((event) => event.type === 'lifecycle-requested'));
+    assert(healthWhileDraining.runtime.supervisor.recentEvents.some((event) => event.type === 'runtime-drain'));
+
+    const resumeResponse = await fetch(`${service.url}/api/runtime/lifecycle-requests`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requestType: 'resume',
+        reason: 'maintenance-finished'
+      })
+    });
+    const resume = await resumeResponse.json();
+
+    assert.equal(resumeResponse.status, 200);
+    assert.equal(resume.requestType, 'resume');
+    assert.equal(resume.previousLifecycleState, 'draining');
+    assert.equal(resume.nextLifecycleState, 'running');
+
+    const events = await fetch(`${service.url}/api/runtime/events`).then((response) => response.json());
+    assert(events.some((event) => event.type === 'runtime-resume'));
+
+    const healthAfterResume = await fetch(`${service.url}/api/health`).then((response) => response.json());
+    assert.equal(healthAfterResume.runtime.lifecycleState, 'running');
+    assert.equal(healthAfterResume.runtime.lifecycleRequestCount, 2);
+    assert.equal(healthAfterResume.runtime.acceptingRouteActivations, true);
+    assert.equal(healthAfterResume.runtime.lastLifecycleRequest.requestId, resume.requestId);
+  });
+});
+
 test('releasing an unknown runtime activation returns a stable not-found error', async () => {
   await withService(async (service) => {
     const releaseResponse = await fetch(
@@ -618,6 +677,63 @@ test('runtime command dispatch rejects unsupported capability use and invalid pa
     const missing = await missingResponse.json();
     assert.equal(missingResponse.status, 404);
     assert.equal(missing.code, 'runtime-activation-not-found');
+  });
+});
+
+test('runtime lifecycle requests reject invalid transitions and block route activation while draining', async () => {
+  await withService(async (service) => {
+    const drainResponse = await fetch(`${service.url}/api/runtime/lifecycle-requests`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requestType: 'drain'
+      })
+    });
+    const drain = await drainResponse.json();
+    assert.equal(drainResponse.status, 200);
+    assert.equal(drain.nextLifecycleState, 'draining');
+
+    const activationResponse = await fetch(`${service.url}/api/runtime/route-activations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        workspaceId: 'workspace-internal-core',
+        surfaceKind: 'thread',
+        scopeId: 'thread-roadmap-71',
+        surfacePackageId: 'nexus.surface.thread',
+        routeCapabilities: [
+          'conversation.read'
+        ],
+        helperSlotRequests: []
+      })
+    });
+    const activation = await activationResponse.json();
+    assert.equal(activationResponse.status, 409);
+    assert.equal(activation.code, 'runtime-lifecycle-not-accepting-activations');
+    assert.equal(activation.details.lifecycleState, 'draining');
+
+    const conflictResponse = await fetch(`${service.url}/api/runtime/lifecycle-requests`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requestType: 'drain'
+      })
+    });
+    const conflict = await conflictResponse.json();
+    assert.equal(conflictResponse.status, 409);
+    assert.equal(conflict.code, 'runtime-lifecycle-conflict');
+
+    const invalidResponse = await fetch(`${service.url}/api/runtime/lifecycle-requests`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requestType: 'hibernate'
+      })
+    });
+    const invalid = await invalidResponse.json();
+    assert.equal(invalidResponse.status, 400);
+    assert.equal(invalid.code, 'runtime-lifecycle-invalid');
   });
 });
 

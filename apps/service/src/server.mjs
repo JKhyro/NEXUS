@@ -220,6 +220,10 @@ async function routeApi(request, response, runtimeAdapter, config) {
     return sendJson(request, response, config, 200, runtimeAdapter.listRuntimeEvents());
   }
 
+  if (request.method === 'POST' && url.pathname === '/api/runtime/lifecycle-requests') {
+    return sendJson(request, response, config, 200, runtimeAdapter.requestRuntimeLifecycle(await readBody(request)));
+  }
+
   if (request.method === 'POST' && url.pathname === '/api/runtime/route-activations/commands') {
     const commandEnvelope = await readBody(request);
     return sendJson(

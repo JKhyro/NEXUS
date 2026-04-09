@@ -1621,6 +1621,25 @@ function summarizeLastRuntimeCrash(health) {
   return `${lastCrash.slotId} ${lastCrash.recoveryAction ?? 'reported'} at ${formatTimestamp(lastCrash.crashedAt)}`;
 }
 
+function summarizeRuntimeLifecycleRequestCount(health) {
+  return String(health?.runtime?.lifecycleRequestCount ?? 0);
+}
+
+function summarizeLastRuntimeLifecycleRequest(health) {
+  const lastLifecycleRequest = health?.runtime?.lastLifecycleRequest ?? null;
+  if (!lastLifecycleRequest?.requestType) {
+    return 'No runtime lifecycle request recorded yet';
+  }
+
+  return `${lastLifecycleRequest.requestType} at ${formatTimestamp(lastLifecycleRequest.requestedAt)}`;
+}
+
+function summarizeRuntimeActivationAcceptance(health) {
+  return health?.runtime?.acceptingRouteActivations === false
+    ? 'Route activation paused'
+    : 'Route activation accepting';
+}
+
 function currentRouteActivationRequest() {
   const directConversation = currentDirectConversation();
   if (directConversation) {
@@ -1929,9 +1948,21 @@ function renderHealth() {
         <span class="eyebrow">Commands</span>
         <strong>${escapeHtml(summarizeRuntimeCommandCount(state.health))}</strong>
       </div>
+      <div class="service-health-metric">
+        <span class="eyebrow">Lifecycle requests</span>
+        <strong>${escapeHtml(summarizeRuntimeLifecycleRequestCount(state.health))}</strong>
+      </div>
       <div class="service-health-metric service-health-metric-wide">
         <span class="eyebrow">Last command</span>
         <strong>${escapeHtml(summarizeLastRuntimeCommand(state.health))}</strong>
+      </div>
+      <div class="service-health-metric service-health-metric-wide">
+        <span class="eyebrow">Last lifecycle</span>
+        <strong>${escapeHtml(summarizeLastRuntimeLifecycleRequest(state.health))}</strong>
+      </div>
+      <div class="service-health-metric service-health-metric-wide">
+        <span class="eyebrow">Activation gate</span>
+        <strong>${escapeHtml(summarizeRuntimeActivationAcceptance(state.health))}</strong>
       </div>
       <div class="service-health-metric">
         <span class="eyebrow">Crashes</span>

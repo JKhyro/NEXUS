@@ -27,10 +27,14 @@ function createRuntimeHealthSnapshot(config, runtimeState, store, supervisorStat
       lastReleasedAt: supervisorStatus.lastReleasedAt,
       lastCommandAt: supervisorStatus.lastCommandAt,
       lastCrashAt: supervisorStatus.lastCrashAt,
+      lastLifecycleRequestAt: supervisorStatus.lastLifecycleRequestAt,
       commandDispatchCount: supervisorStatus.commandDispatchCount,
       crashCount: supervisorStatus.crashCount,
+      lifecycleRequestCount: supervisorStatus.lifecycleRequestCount,
+      acceptingRouteActivations: supervisorStatus.acceptingRouteActivations,
       lastCommand: supervisorStatus.lastCommand,
       lastCrash: supervisorStatus.lastCrash,
+      lastLifecycleRequest: supervisorStatus.lastLifecycleRequest,
       activeRouteActivationCount: supervisorStatus.activeRouteActivationCount,
       activeRouteActivations: supervisorStatus.activeRouteActivations,
       manifestRegistry: supervisorStatus.manifestRegistry,
@@ -66,6 +70,13 @@ function createRuntimeCrashActivationIdError() {
   error.details = {
     field: 'activationId'
   };
+  return error;
+}
+
+function createRuntimeLifecycleRequestError() {
+  const error = new Error('Runtime lifecycle requests require a JSON object payload.');
+  error.code = 'runtime-lifecycle-invalid';
+  error.statusCode = 400;
   return error;
 }
 
@@ -107,6 +118,15 @@ export function createInProcessRuntimeAdapter({
     },
     listRuntimeEvents() {
       return runtimeSupervisor.listEvents();
+    },
+    requestRuntimeLifecycle(lifecycleEnvelope) {
+      if (!runtimeSupervisor.isReady()) {
+        throw createRuntimeSupervisorNotReadyError(runtimeSupervisor.getStatus());
+      }
+      if (!lifecycleEnvelope || typeof lifecycleEnvelope !== 'object' || Array.isArray(lifecycleEnvelope)) {
+        throw createRuntimeLifecycleRequestError();
+      }
+      return runtimeSupervisor.requestLifecycle(lifecycleEnvelope);
     },
     async dispatchRouteCommand(activationId, commandEnvelope) {
       if (!runtimeSupervisor.isReady()) {
