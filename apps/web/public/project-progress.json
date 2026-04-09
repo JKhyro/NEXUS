@@ -1,10 +1,10 @@
 {
   "title": "Project Pulse",
-  "capturedAt": "2026-04-09T15:02:55+09:00",
-  "capturedAtLabel": "Reviewed Apr 9, 2026, 15:02 JST",
-  "summary": "Issue #56 has moved forward again: route activation now covers channel, forum, direct, and thread surfaces, the client shows manifest-backed surface and helper-slot state in the scope summary, issue #57 remains in progress, and the project board is still GraphQL-blocked.",
-  "source": "GitHub-first NEXUS truth sweep during the active issue #56 surface-expansion lane, plus verified local implementation coverage for widened route activation and client-visible activation state.",
-  "nextAction": "Publish the widened issue #56 surface-expansion delta, keep helper-slot and activation diagnostics legible in the client, and retry project-board sync when GitHub GraphQL recovers.",
+  "capturedAt": "2026-04-09T15:11:00+09:00",
+  "capturedAtLabel": "Reviewed Apr 9, 2026, 15:11 JST",
+  "summary": "Issue #56 is shipped and closed through PR #68, manifest-backed activation now covers thread, channel, forum, and direct surfaces in the client, issue #57 is back to the execute-now lane, and the project board is still GraphQL-blocked.",
+  "source": "GitHub-first NEXUS truth sweep after the PR #68 merge, plus verified main-branch coverage for widened route activation and client-visible activation state.",
+  "nextAction": "Keep issue #57 moving on the deeper runtime-ownership seam, preserve the new operator-visible activation diagnostics, and retry project-board sync when GitHub GraphQL recovers.",
   "lanes": [
     {
       "kind": "PR",
@@ -33,7 +33,7 @@
       "ref": "#54",
       "status": "done",
       "title": "Desktop readiness validation",
-      "summary": "Continuity validation closed cleanly on the Electron and Node baseline, and the merged repo remains green with 75 out of 75 automated checks after the later route-activation coverage landed.",
+      "summary": "Continuity validation closed cleanly on the Electron and Node baseline, and the merged repo remains green with 79 out of 79 automated checks after the later surface-activation coverage landed.",
       "nextAction": "Use the verified baseline as the migration source for the next runtime-topology work.",
       "artifacts": [
         {
@@ -145,12 +145,46 @@
       ]
     },
     {
+      "kind": "PR",
+      "ref": "#68",
+      "status": "done",
+      "title": "Expanded surface activation and client diagnostics",
+      "summary": "Manifest-backed activation now covers thread, channel, forum, and direct conversation routes on main, review helpers can mount on the widened surface set, and the client surfaces program, helper-slot, and activation-diagnostic state directly in the scope summary.",
+      "nextAction": "Treat the shipped surface activation model as the operator baseline while #57 continues the deeper runtime-ownership lane.",
+      "artifacts": [
+        {
+          "label": "Surface activation client summary",
+          "path": "apps/web/public/app.js"
+        },
+        {
+          "label": "Project Pulse snapshot",
+          "path": "apps/web/public/project-progress.json"
+        },
+        {
+          "label": "Channel surface example",
+          "path": "config/runtime-packages/surface-channel.example.json"
+        },
+        {
+          "label": "Direct surface example",
+          "path": "config/runtime-packages/surface-direct.example.json"
+        },
+        {
+          "label": "Forum surface example",
+          "path": "config/runtime-packages/surface-forum.example.json"
+        },
+        {
+          "label": "Surface activation verification",
+          "path": "test/service.test.mjs"
+        }
+      ]
+    },
+    {
       "kind": "Issue",
       "ref": "#57",
-      "status": "in-progress",
+      "status": "execute-now",
       "title": "Packaging and runtime topology",
-      "summary": "Native-C-first topology remains active, and the degraded runtime supervisor seam is now live in code. Deeper runtime ownership and project-board reconciliation still remain before this lane is complete.",
-      "nextAction": "Retry project-board sync when GitHub GraphQL recovers, then keep moving activation and lifecycle ownership behind the runtime seam without breaking continuity.",
+      "summary": "With #56 shipped, the runtime-topology lane is active again. The degraded runtime supervisor seam and widened surface activation are live on main, but deeper runtime ownership and project-board reconciliation still remain before this lane is complete.",
+      "nextAction": "Move the next deeper runtime-ownership slice behind the supervisor seam, then retry project-board sync when GitHub GraphQL recovers.",
       "artifacts": [
         {
           "label": "First migration seam record",
@@ -173,10 +207,10 @@
     {
       "kind": "Issue",
       "ref": "#56",
-      "status": "execute-now",
+      "status": "done",
       "title": "Conversation-surface program model",
-      "summary": "Manifest-backed route activation now spans thread, channel, forum, and direct surfaces in the active implementation lane, and the operator-facing client now exposes surface-program, helper-slot, and activation-diagnostic state directly in the scope summary.",
-      "nextAction": "Publish the current surface-expansion delta, then continue with deeper helper-slot registry behavior and richer operator-visible activation state.",
+      "summary": "The conversation-surface model is now shipped on main: manifest-backed route activation spans thread, channel, forum, and direct surfaces, compatible review helpers mount across the widened surface set, and the operator-facing client exposes surface-program, helper-slot, and activation-diagnostic state directly in the scope summary.",
+      "nextAction": "Use the shipped conversation-surface baseline while the active #57 runtime-topology lane continues.",
       "artifacts": [
         {
           "label": "Conversation-surface program model",
