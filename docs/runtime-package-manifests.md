@@ -131,3 +131,7 @@ The future native runtime should:
 
 - [surface-thread.example.json](/C:/Users/Allan/OneDrive/Documents/NEXUS/config/runtime-packages/surface-thread.example.json)
 - [helper-review.example.json](/C:/Users/Allan/OneDrive/Documents/NEXUS/config/runtime-packages/helper-review.example.json)
+
+## Next concrete slice
+
+The next implementation-facing record is [runtime-first-migration-seam.md](runtime-first-migration-seam.md), which uses these manifest contracts to choose the first runtime boundary that can move out from behind the current Electron and Node continuity baseline without breaking the shipped operator surface.
