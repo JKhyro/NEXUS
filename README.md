@@ -137,3 +137,4 @@ Live `POST /api/adapters/discord/events` ingress now persists a relay record for
 - [ANVIL integration contract](docs/anvil-integration-contract.md)
 - [Discord cutover plan](docs/discord-cutover-plan.md)
 - [Hosted service mode](docs/hosted-service-mode.md)
+- [Runtime topology](docs/runtime-topology.md)

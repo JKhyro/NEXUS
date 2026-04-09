@@ -1607,6 +1607,7 @@ function renderProjectPulse() {
   `;
 
   const stats = [
+    { label: 'Done', value: summary.counts.done, tone: 'done' },
     { label: 'Execute now', value: summary.counts.executeNow, tone: 'execute-now' },
     { label: 'In progress', value: summary.counts.inProgress, tone: 'in-progress' },
     { label: 'Queued', value: summary.counts.queued, tone: 'queued' },
