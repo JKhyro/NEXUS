@@ -24,6 +24,11 @@ test('service boots and exposes the seeded internal channel map', async () => {
   await withService(async (service) => {
     const health = await fetch(`${service.url}/api/health`).then((response) => response.json());
     assert.equal(health.status, 'ok');
+    assert.equal(health.runtime.owner, 'node-transition-adapter');
+    assert.equal(health.runtime.targetOwner, 'native-runtime-core');
+    assert.equal(health.runtime.transitionSeam, 'service-runtime-boundary');
+    assert.equal(health.runtime.backingImplementation, 'in-process-store');
+    assert.equal(health.runtime.lifecycleState, 'running');
 
     const workspaces = await fetch(`${service.url}/api/workspaces?actorId=identity-jack`).then((response) => response.json());
     assert.equal(workspaces.length, 1);
