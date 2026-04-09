@@ -114,3 +114,7 @@ This seam is complete when:
 - the current Electron/web operator surface can run against that runtime without contract regressions
 - health and failure signals from the runtime core are visible through the existing operator diagnostics
 - the next host-side migration, including the Avalonia transition and issue `#56` program-model work, can build against a real runtime owner instead of the temporary Node baseline
+
+## Immediate follow-on
+
+The next record against this seam is [conversation-surface-program-model.md](conversation-surface-program-model.md), which defines the first route-local child-program model and helper-slot activation envelope on top of the merged manifest contracts.

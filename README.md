@@ -163,5 +163,6 @@ Live `POST /api/adapters/discord/events` ingress now persists a relay record for
 - [Discord cutover plan](docs/discord-cutover-plan.md)
 - [Hosted service mode](docs/hosted-service-mode.md)
 - [Runtime topology](docs/runtime-topology.md)
-- [Runtime package manifests](docs/runtime-package-manifests.md)
 - [First runtime migration seam](docs/runtime-first-migration-seam.md)
+- [Runtime package manifests](docs/runtime-package-manifests.md)
+- [Conversation-surface program model](docs/conversation-surface-program-model.md)

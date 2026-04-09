@@ -65,7 +65,7 @@ The runtime should reject a surface manifest when:
 - `abiVersion` governs runtime boundary compatibility
 - package upgrades must not silently widen required capabilities
 
-Example file: [surface-thread.example.json](/C:/Users/Allan/OneDrive/Documents/NEXUS/config/runtime-packages/surface-thread.example.json)
+Example file: [surface-thread.example.json](../config/runtime-packages/surface-thread.example.json)
 
 ## Helper-package manifest
 
@@ -115,7 +115,7 @@ The runtime should reject a helper manifest when:
 - `manifestVersion` governs manifest shape
 - helpers must declare slot compatibility explicitly rather than relying on implicit UI placement
 
-Example file: [helper-review.example.json](/C:/Users/Allan/OneDrive/Documents/NEXUS/config/runtime-packages/helper-review.example.json)
+Example file: [helper-review.example.json](../config/runtime-packages/helper-review.example.json)
 
 ## Example usage
 
@@ -127,11 +127,14 @@ The future native runtime should:
 4. load only helper-package manifests whose slot targets and capabilities are compatible
 5. hand the approved package metadata to the Avalonia host for rendering
 
+## Immediate follow-on
+
+The next records that build directly on these manifest contracts are:
+
+- [runtime-first-migration-seam.md](runtime-first-migration-seam.md)
+- [conversation-surface-program-model.md](conversation-surface-program-model.md)
+
 ## Initial manifest files
 
-- [surface-thread.example.json](/C:/Users/Allan/OneDrive/Documents/NEXUS/config/runtime-packages/surface-thread.example.json)
-- [helper-review.example.json](/C:/Users/Allan/OneDrive/Documents/NEXUS/config/runtime-packages/helper-review.example.json)
-
-## Next concrete slice
-
-The next implementation-facing record is [runtime-first-migration-seam.md](runtime-first-migration-seam.md), which uses these manifest contracts to choose the first runtime boundary that can move out from behind the current Electron and Node continuity baseline without breaking the shipped operator surface.
+- [surface-thread.example.json](../config/runtime-packages/surface-thread.example.json)
+- [helper-review.example.json](../config/runtime-packages/helper-review.example.json)

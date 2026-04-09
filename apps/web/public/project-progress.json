@@ -1,10 +1,10 @@
 {
   "title": "Project Pulse",
-  "capturedAt": "2026-04-09T13:41:28+09:00",
-  "capturedAtLabel": "Reviewed Apr 9, 2026, 13:41 JST",
-  "summary": "PR #60 is now merged, the NEXUS project board is synced again, and the active issue #57 lane has advanced from manifest contracts to choosing the first migration seam away from the current Electron and Node continuity baseline.",
-  "source": "GitHub-first NEXUS truth sweep after PR #60 merge, issue #57 writeback, and successful NEXUS project-board resync.",
-  "nextAction": "Define the first migration seam that moves runtime supervision and package activation behind the current service/API boundary while keeping the shipped Electron shell and web client as the continuity host.",
+  "capturedAt": "2026-04-09T14:50:00+09:00",
+  "capturedAtLabel": "Reviewed Apr 9, 2026, 14:50 JST",
+  "summary": "PR #60 is merged, the NEXUS project board is back in sync, and the active work has now expanded from issue #57's first migration seam into the newly activated issue #56 conversation-surface program model.",
+  "source": "GitHub-first NEXUS truth sweep after PR #60 merge, project-board resync, and the active migration-seam plus conversation-surface branch review.",
+  "nextAction": "Move the first Electron-owned runtime responsibility behind a native supervisor seam without breaking the verified HTTP/UI contract, then carry the conversation-surface child-program model into route activation and helper-slot work.",
   "lanes": [
     {
       "kind": "PR",
@@ -75,11 +75,11 @@
       "ref": "#60",
       "status": "done",
       "title": "Runtime package manifest contracts",
-      "summary": "The first runtime package-manifest record, example package files, and Project Pulse artifact surfacing are now merged on main.",
-      "nextAction": "Use the merged manifest contracts to choose the first runtime migration seam before opening the downstream conversation-surface program-model lane.",
+      "summary": "The first explicit surface-package and helper-package manifest contracts are merged on main, and Project Pulse can now expose architecture artifacts directly in the UI.",
+      "nextAction": "Use the merged contracts to pick the first migration seam and activate the conversation-surface program model.",
       "artifacts": [
         {
-          "label": "Manifest contract record",
+          "label": "Runtime package manifest record",
           "path": "docs/runtime-package-manifests.md"
         },
         {
@@ -97,8 +97,8 @@
       "ref": "#57",
       "status": "execute-now",
       "title": "Packaging and runtime topology",
-      "summary": "Native-C-first topology remains the active engineering lane, and the next concrete slice is the first migration seam that moves runtime supervision and package activation out from behind the temporary Node baseline.",
-      "nextAction": "Keep the shipped Electron shell and current web client as the continuity host while defining the runtime-core seam that should land first.",
+      "summary": "Native-C-first topology remains the active engineering lane, and the next concrete slice is the first replacement seam that moves Electron-owned runtime supervision toward the future native core without breaking continuity.",
+      "nextAction": "Define the first native supervisor seam around service lifecycle, health, logging, and startup failure handling while preserving the current web/API surface as the migration baseline.",
       "artifacts": [
         {
           "label": "First migration seam record",
@@ -111,16 +111,26 @@
         {
           "label": "Runtime topology record",
           "path": "docs/runtime-topology.md"
+        },
+        {
+          "label": "Current service supervisor baseline",
+          "path": "apps/desktop/src/service-runtime.mjs"
         }
       ]
     },
     {
       "kind": "Issue",
       "ref": "#56",
-      "status": "queued",
+      "status": "in-progress",
       "title": "Conversation-surface program model",
-      "summary": "The child-program and embedded-helper surface model is now unblocked by the merged manifest contracts, but it stays queued until the first runtime migration seam is selected.",
-      "nextAction": "Move this lane to active work after issue #57 defines the first runtime seam against the merged manifest and topology baseline."
+      "summary": "The first child-program model is now active against the merged manifest contracts so channel, forum, thread, timeline, and direct surfaces can declare helper slots and ownership-visible hosting rules explicitly.",
+      "nextAction": "Define the first route-activation envelope and per-surface slot model without hiding imported-helper ownership or failure state.",
+      "artifacts": [
+        {
+          "label": "Conversation-surface program model",
+          "path": "docs/conversation-surface-program-model.md"
+        }
+      ]
     },
     {
       "kind": "Issue",
