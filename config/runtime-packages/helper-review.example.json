@@ -13,6 +13,18 @@
     {
       "surfacePackageId": "nexus.surface.thread",
       "slotId": "thread-sidebar"
+    },
+    {
+      "surfacePackageId": "nexus.surface.channel",
+      "slotId": "channel-sidebar"
+    },
+    {
+      "surfacePackageId": "nexus.surface.forum",
+      "slotId": "forum-insights"
+    },
+    {
+      "surfacePackageId": "nexus.surface.direct",
+      "slotId": "participant-card"
     }
   ],
   "presentationHooks": [

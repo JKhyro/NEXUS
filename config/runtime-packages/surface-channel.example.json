@@ -1,0 +1,38 @@
+{
+  "packageId": "nexus.surface.channel",
+  "displayName": "NEXUS Channel Surface",
+  "manifestVersion": "1",
+  "abiVersion": "1",
+  "surfaceKind": "channel",
+  "entrypoint": {
+    "runtime": "native-c",
+    "symbol": "nexus_surface_channel_bootstrap"
+  },
+  "hostCapabilities": [
+    "conversation.read",
+    "message.compose",
+    "coordination.focus",
+    "route.selection"
+  ],
+  "routing": {
+    "scopeType": "channel",
+    "requiresMessageStream": true
+  },
+  "helperSlots": [
+    {
+      "slotId": "channel-sidebar",
+      "allowedKinds": [
+        "inspector",
+        "review-helper"
+      ]
+    }
+  ],
+  "failurePolicy": {
+    "onCrash": "degrade-surface",
+    "onIncompatibleHelper": "reject-helper"
+  },
+  "compatibility": {
+    "minHost": "nexus-host-avalonia@1",
+    "minRuntime": "nexus-runtime-core@1"
+  }
+}

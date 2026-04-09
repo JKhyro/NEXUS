@@ -1,0 +1,38 @@
+{
+  "packageId": "nexus.surface.forum",
+  "displayName": "NEXUS Forum Surface",
+  "manifestVersion": "1",
+  "abiVersion": "1",
+  "surfaceKind": "forum",
+  "entrypoint": {
+    "runtime": "native-c",
+    "symbol": "nexus_surface_forum_bootstrap"
+  },
+  "hostCapabilities": [
+    "conversation.read",
+    "message.compose",
+    "coordination.focus",
+    "route.selection"
+  ],
+  "routing": {
+    "scopeType": "channel",
+    "requiresPostSelection": false
+  },
+  "helperSlots": [
+    {
+      "slotId": "forum-insights",
+      "allowedKinds": [
+        "inspector",
+        "review-helper"
+      ]
+    }
+  ],
+  "failurePolicy": {
+    "onCrash": "degrade-surface",
+    "onIncompatibleHelper": "reject-helper"
+  },
+  "compatibility": {
+    "minHost": "nexus-host-avalonia@1",
+    "minRuntime": "nexus-runtime-core@1"
+  }
+}

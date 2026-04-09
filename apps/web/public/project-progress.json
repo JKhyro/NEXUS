@@ -1,10 +1,10 @@
 {
   "title": "Project Pulse",
-  "capturedAt": "2026-04-09T14:40:00+09:00",
-  "capturedAtLabel": "Reviewed Apr 9, 2026, 14:40 JST",
-  "summary": "PR #66 is merged, NEXUS now exposes a degraded runtime supervisor seam through `/api/health`, and the next execute-now lane moves back to issue #56 while issue #57 stays active and the project board remains GraphQL-blocked.",
-  "source": "GitHub-first NEXUS truth sweep after PR #66 merge and issue #57 writeback; project-board sync remains blocked by GitHub GraphQL rate limiting.",
-  "nextAction": "Extend route activation and helper-slot execution beyond the first thread surface, keep the newly merged supervisor state readable in the client, and retry project-board sync when GitHub GraphQL recovers.",
+  "capturedAt": "2026-04-09T15:02:55+09:00",
+  "capturedAtLabel": "Reviewed Apr 9, 2026, 15:02 JST",
+  "summary": "Issue #56 has moved forward again: route activation now covers channel, forum, direct, and thread surfaces, the client shows manifest-backed surface and helper-slot state in the scope summary, issue #57 remains in progress, and the project board is still GraphQL-blocked.",
+  "source": "GitHub-first NEXUS truth sweep during the active issue #56 surface-expansion lane, plus verified local implementation coverage for widened route activation and client-visible activation state.",
+  "nextAction": "Publish the widened issue #56 surface-expansion delta, keep helper-slot and activation diagnostics legible in the client, and retry project-board sync when GitHub GraphQL recovers.",
   "lanes": [
     {
       "kind": "PR",
@@ -175,8 +175,8 @@
       "ref": "#56",
       "status": "execute-now",
       "title": "Conversation-surface program model",
-      "summary": "The first child-program model is executable for the thread surface, and the next immediate expansion is wider conversation-surface coverage plus more legible activation and failure state in the operator-facing client.",
-      "nextAction": "Extend route activation and helper-slot execution beyond the first thread surface and surface the resulting activation state more directly in the client.",
+      "summary": "Manifest-backed route activation now spans thread, channel, forum, and direct surfaces in the active implementation lane, and the operator-facing client now exposes surface-program, helper-slot, and activation-diagnostic state directly in the scope summary.",
+      "nextAction": "Publish the current surface-expansion delta, then continue with deeper helper-slot registry behavior and richer operator-visible activation state.",
       "artifacts": [
         {
           "label": "Conversation-surface program model",
@@ -189,6 +189,10 @@
         {
           "label": "Route activation service coverage",
           "path": "test/service.test.mjs"
+        },
+        {
+          "label": "Surface activation client summary",
+          "path": "apps/web/public/app.js"
         },
         {
           "label": "Runtime supervisor seam",

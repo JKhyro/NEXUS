@@ -44,7 +44,7 @@ test('service boots and exposes the seeded internal channel map', async () => {
     assert.equal(health.runtime.readiness, 'ready');
     assert.equal(health.runtime.backingImplementation, 'in-process-store');
     assert.equal(health.runtime.lifecycleState, 'running');
-    assert.equal(health.runtime.manifestRegistry.surfacePackageCount, 1);
+    assert.equal(health.runtime.manifestRegistry.surfacePackageCount, 4);
     assert.equal(health.runtime.manifestRegistry.helperPackageCount, 1);
     assert.equal(health.runtime.supervisor.transitionSeam, 'service-runtime-supervisor-boundary');
     assert.equal(health.runtime.supervisor.readiness, 'ready');
@@ -172,6 +172,121 @@ test('route activation resolves a manifest-backed thread surface and compatible 
       'message.inspect',
       'coordination.suggest'
     ]);
+    assert.deepEqual(activation.diagnostics, []);
+  });
+});
+
+test('route activation resolves a manifest-backed channel surface and compatible helper slot', async () => {
+  await withService(async (service) => {
+    const activationResponse = await fetch(`${service.url}/api/runtime/route-activations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        workspaceId: 'workspace-internal-core',
+        surfaceKind: 'channel',
+        scopeId: 'channel-workflow',
+        surfacePackageId: 'nexus.surface.channel',
+        routeCapabilities: [
+          'conversation.read',
+          'message.compose',
+          'route.selection'
+        ],
+        helperSlotRequests: [
+          {
+            slotId: 'channel-sidebar',
+            preferredHelperPackageId: 'symbiosis.helper.review'
+          }
+        ]
+      })
+    });
+    const activation = await activationResponse.json();
+
+    assert.equal(activationResponse.status, 200);
+    assert.equal(activation.route.surfaceKind, 'channel');
+    assert.equal(activation.route.scopeId, 'channel-workflow');
+    assert.equal(activation.surface.packageId, 'nexus.surface.channel');
+    assert.equal(activation.helperSlots.length, 1);
+    assert.equal(activation.helperSlots[0].status, 'bound');
+    assert.equal(activation.helperSlots[0].helper.packageId, 'symbiosis.helper.review');
+    assert.deepEqual(activation.diagnostics, []);
+  });
+});
+
+test('route activation resolves a manifest-backed forum surface and compatible helper slot', async () => {
+  await withService(async (service) => {
+    const activationResponse = await fetch(`${service.url}/api/runtime/route-activations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        workspaceId: 'workspace-internal-core',
+        surfaceKind: 'forum',
+        scopeId: 'channel-report',
+        surfacePackageId: 'nexus.surface.forum',
+        routeCapabilities: [
+          'conversation.read',
+          'route.selection'
+        ],
+        helperSlotRequests: [
+          {
+            slotId: 'forum-insights',
+            preferredHelperPackageId: 'symbiosis.helper.review'
+          }
+        ]
+      })
+    });
+    const activation = await activationResponse.json();
+
+    assert.equal(activationResponse.status, 200);
+    assert.equal(activation.route.surfaceKind, 'forum');
+    assert.equal(activation.surface.packageId, 'nexus.surface.forum');
+    assert.equal(activation.helperSlots.length, 1);
+    assert.equal(activation.helperSlots[0].status, 'bound');
+    assert.deepEqual(activation.diagnostics, []);
+  });
+});
+
+test('route activation resolves a manifest-backed direct surface and compatible helper slot', async () => {
+  await withService(async (service) => {
+    const directConversation = await fetch(`${service.url}/api/direct-conversations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        memberIdentityIds: ['identity-jack', 'identity-kira']
+      })
+    }).then((response) => response.json());
+
+    const activationResponse = await fetch(`${service.url}/api/runtime/route-activations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        workspaceId: 'workspace-internal-core',
+        surfaceKind: 'direct',
+        scopeId: directConversation.id,
+        surfacePackageId: 'nexus.surface.direct',
+        routeCapabilities: [
+          'conversation.read',
+          'message.compose'
+        ],
+        helperSlotRequests: [
+          {
+            slotId: 'participant-card',
+            preferredHelperPackageId: 'symbiosis.helper.review'
+          }
+        ]
+      })
+    });
+    const activation = await activationResponse.json();
+
+    assert.equal(activationResponse.status, 200);
+    assert.equal(activation.route.surfaceKind, 'direct');
+    assert.equal(activation.route.scopeId, directConversation.id);
+    assert.equal(activation.surface.packageId, 'nexus.surface.direct');
+    assert.equal(activation.helperSlots.length, 1);
+    assert.equal(activation.helperSlots[0].status, 'bound');
     assert.deepEqual(activation.diagnostics, []);
   });
 });

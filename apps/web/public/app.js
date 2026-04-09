@@ -151,6 +151,8 @@ const state = {
   coordinationFocusMode: 'scope',
   selectedScope: null,
   health: null,
+  routeActivation: null,
+  routeActivationError: null,
   routeHistory: createRouteHistoryState(12),
   routeHistorySuspended: false
 };
@@ -174,7 +176,10 @@ async function getJson(path) {
   const response = await fetch(path);
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error ?? `Request failed for ${path}`);
+    const error = new Error(payload.error ?? `Request failed for ${path}`);
+    error.code = typeof payload.code === 'string' ? payload.code : null;
+    error.details = payload.details ?? null;
+    throw error;
   }
   return payload;
 }
@@ -189,7 +194,10 @@ async function postJson(path, payload) {
   });
   const result = await response.json();
   if (!response.ok) {
-    throw new Error(result.error ?? `Request failed for ${path}`);
+    const error = new Error(result.error ?? `Request failed for ${path}`);
+    error.code = typeof result.code === 'string' ? result.code : null;
+    error.details = result.details ?? null;
+    throw error;
   }
   return result;
 }
@@ -1573,6 +1581,120 @@ function summarizeServiceStorage(health) {
   return 'Storage mode unavailable';
 }
 
+function currentRouteActivationRequest() {
+  const directConversation = currentDirectConversation();
+  if (directConversation) {
+    return {
+      actorId: selectedActor(),
+      workspaceId: selectedWorkspace(),
+      surfaceKind: 'direct',
+      scopeId: directConversation.id,
+      selectedMessageId: state.selectedMessageId ?? undefined,
+      surfacePackageId: 'nexus.surface.direct',
+      routeCapabilities: [
+        'conversation.read',
+        'message.compose',
+        'route.selection'
+      ],
+      helperSlotRequests: [
+        {
+          slotId: 'participant-card',
+          preferredHelperPackageId: 'symbiosis.helper.review'
+        }
+      ]
+    };
+  }
+
+  const thread = currentThread();
+  if (thread) {
+    return {
+      actorId: selectedActor(),
+      workspaceId: selectedWorkspace(),
+      surfaceKind: 'thread',
+      scopeId: thread.id,
+      selectedMessageId: state.selectedMessageId ?? undefined,
+      surfacePackageId: 'nexus.surface.thread',
+      routeCapabilities: [
+        'conversation.read',
+        'message.compose',
+        'coordination.focus'
+      ],
+      helperSlotRequests: [
+        {
+          slotId: 'thread-sidebar',
+          preferredHelperPackageId: 'symbiosis.helper.review'
+        }
+      ]
+    };
+  }
+
+  const channel = currentChannel();
+  if (!channel) {
+    return null;
+  }
+
+  if (channel.kind === 'forum') {
+    return {
+      actorId: selectedActor(),
+      workspaceId: selectedWorkspace(),
+      surfaceKind: 'forum',
+      scopeId: channel.id,
+      selectedMessageId: state.selectedMessageId ?? undefined,
+      surfacePackageId: 'nexus.surface.forum',
+      routeCapabilities: [
+        'conversation.read',
+        'message.compose',
+        'route.selection'
+      ],
+      helperSlotRequests: [
+        {
+          slotId: 'forum-insights',
+          preferredHelperPackageId: 'symbiosis.helper.review'
+        }
+      ]
+    };
+  }
+
+  return {
+    actorId: selectedActor(),
+    workspaceId: selectedWorkspace(),
+    surfaceKind: 'channel',
+    scopeId: channel.id,
+    selectedMessageId: state.selectedMessageId ?? undefined,
+    surfacePackageId: 'nexus.surface.channel',
+    routeCapabilities: [
+      'conversation.read',
+      'message.compose',
+      'route.selection'
+    ],
+    helperSlotRequests: [
+      {
+        slotId: 'channel-sidebar',
+        preferredHelperPackageId: 'symbiosis.helper.review'
+      }
+    ]
+  };
+}
+
+function summarizeRouteActivationHelpers(activation) {
+  if (!Array.isArray(activation?.helperSlots) || activation.helperSlots.length === 0) {
+    return 'No helper slots requested';
+  }
+
+  return activation.helperSlots.map((slot) => {
+    const helperLabel = slot.helper?.displayName ?? slot.helper?.packageId ?? 'No helper bound';
+    return `${slot.slotId}: ${slot.status}${slot.status === 'bound' ? ` (${helperLabel})` : ''}`;
+  }).join(' | ');
+}
+
+function summarizeRouteActivationDiagnostics(activation) {
+  if (!Array.isArray(activation?.diagnostics) || activation.diagnostics.length === 0) {
+    return 'No activation diagnostics';
+  }
+
+  return activation.diagnostics.map((entry) => entry.code ?? entry.message ?? 'diagnostic').join(', ');
+}
+
 function summarizeSupervisorTone(supervisor) {
   if (supervisor?.readiness === 'ready') {
     return 'success';
@@ -2187,6 +2309,19 @@ function renderScopeSummary() {
     summaryLines.push(`<strong>Message Handoffs</strong><span>${escapeHtml(coordination.handoffCount)}</span>`);
   }
 
+  if (state.routeActivation) {
+    summaryLines.push(`<strong>Surface Program</strong><span>${escapeHtml(`${state.routeActivation.surface.displayName} (${state.routeActivation.surface.packageId})`)}</span>`);
+    summaryLines.push(`<strong>Helper Slots</strong><span>${escapeHtml(summarizeRouteActivationHelpers(state.routeActivation))}</span>`);
+    summaryLines.push(`<strong>Activation Diagnostics</strong><span>${escapeHtml(summarizeRouteActivationDiagnostics(state.routeActivation))}</span>`);
+  }
+  else if (state.routeActivationError) {
+    summaryLines.push(`<strong>Surface Program</strong><span>${escapeHtml(`Activation blocked (${state.routeActivationError.code ?? 'route-activation-error'})`)}</span>`);
+    summaryLines.push(`<strong>Activation Diagnostics</strong><span>${escapeHtml(state.routeActivationError.message)}</span>`);
+    if (state.routeActivationError.details?.supervisor?.readiness) {
+      summaryLines.push(`<strong>Runtime Seam</strong><span>${escapeHtml(`${state.routeActivationError.details.supervisor.readiness} / ${state.routeActivationError.details.supervisor.lifecycleState ?? 'unknown'}`)}</span>`);
+    }
+  }
+
   scopeSummaryEl.className = 'summary-card';
   scopeSummaryEl.innerHTML = summaryLines.map((line) => `<div class="summary-row">${line}</div>`).join('');
 }
@@ -2546,6 +2681,28 @@ async function loadMessagesForScope(scopeType, scopeId) {
   state.messages = await getJson(`/api/messages?actorId=${encodeURIComponent(selectedActor())}&scopeType=${encodeURIComponent(scopeType)}&scopeId=${encodeURIComponent(scopeId)}`);
 }
 
+async function loadRouteActivation() {
+  const request = currentRouteActivationRequest();
+  if (!request) {
+    state.routeActivation = null;
+    state.routeActivationError = null;
+    return;
+  }
+
+  try {
+    state.routeActivation = await postJson('/api/runtime/route-activations', request);
+    state.routeActivationError = null;
+  }
+  catch (error) {
+    state.routeActivation = null;
+    state.routeActivationError = {
+      message: error.message,
+      code: error.code,
+      details: error.details
+    };
+  }
+}
+
 async function loadExternalReferences() {
   if (state.selectedScope) {
     state.scopeExternalReferences = await getJson(
@@ -2739,6 +2896,7 @@ async function syncSelection() {
     if (!state.messages.some((message) => message.id === state.selectedMessageId)) {
       state.selectedMessageId = null;
     }
+    await loadRouteActivation();
     await loadExternalReferences();
     await loadCoordinationRecords();
     await loadRecentActivity();
@@ -2751,6 +2909,7 @@ async function syncSelection() {
     state.selectedScope = null;
     state.messages = [];
     state.selectedMessageId = null;
+    await loadRouteActivation();
     await loadExternalReferences();
     await loadCoordinationRecords();
     await loadRecentActivity();
@@ -2765,6 +2924,8 @@ async function syncSelection() {
       state.selectedThreadId = null;
       state.selectedScope = null;
       state.messages = [];
+      state.selectedMessageId = null;
+      await loadRouteActivation();
     }
     else {
       if (!posts.some((post) => post.id === state.selectedPostId)) {
@@ -2790,6 +2951,10 @@ async function syncSelection() {
         };
         await loadMessagesForScope('post', state.selectedPostId);
       }
+      if (!state.messages.some((message) => message.id === state.selectedMessageId)) {
+        state.selectedMessageId = null;
+      }
+      await loadRouteActivation();
     }
   }
   else {
@@ -2812,6 +2977,10 @@ async function syncSelection() {
       };
       await loadMessagesForScope('channel', channel.id);
     }
+    if (!state.messages.some((message) => message.id === state.selectedMessageId)) {
+      state.selectedMessageId = null;
+    }
+    await loadRouteActivation();
   }
 
   if (!state.messages.some((message) => message.id === state.selectedMessageId)) {
