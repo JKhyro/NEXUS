@@ -2,6 +2,7 @@ import { createId } from './ids.mjs';
 
 const DEFAULT_EVENT_LIMIT = 10;
 const ALLOWED_LIFECYCLE_STATES = new Set(['active', 'background', 'suspended', 'draining']);
+const ALLOWED_RUNTIME_LIFECYCLE_REQUESTS = new Set(['drain', 'resume', 'stop-requested']);
 
 function timestamp(now) {
   const value = now();
@@ -48,6 +49,22 @@ function createCommandValidationError(message, details = null) {
   return error;
 }
 
+function createLifecycleValidationError(message, details = null) {
+  const error = new Error(message);
+  error.code = 'runtime-lifecycle-invalid';
+  error.statusCode = 400;
+  error.details = details;
+  return error;
+}
+
+function createLifecycleConflictError(message, details = null) {
+  const error = new Error(message);
+  error.code = 'runtime-lifecycle-conflict';
+  error.statusCode = 409;
+  error.details = details;
+  return error;
+}
+
 function createCommandCapabilityDeniedError(activationId, commandType, requiredCapability) {
   const error = new Error(`Runtime activation ${activationId} is not approved to dispatch ${commandType} with capability ${requiredCapability}.`);
   error.code = 'runtime-command-capability-denied';
@@ -83,6 +100,37 @@ function summarizeDiagnostic(diagnostic) {
     slotId: diagnostic.slotId ?? null,
     helperPackageId: diagnostic.helperPackageId ?? null,
     message: diagnostic.message ?? 'Runtime activation diagnostic.'
+  };
+}
+
+function ensureLifecycleRequestEnvelope(lifecycleEnvelope) {
+  if (!lifecycleEnvelope || typeof lifecycleEnvelope !== 'object' || Array.isArray(lifecycleEnvelope)) {
+    throw createLifecycleValidationError('Runtime lifecycle requests require a JSON object payload.');
+  }
+
+  if (typeof lifecycleEnvelope.requestType !== 'string' || lifecycleEnvelope.requestType.trim().length === 0) {
+    throw createLifecycleValidationError('Runtime lifecycle field requestType must be a non-empty string.', {
+      field: 'requestType'
+    });
+  }
+
+  const requestType = lifecycleEnvelope.requestType.trim();
+  if (!ALLOWED_RUNTIME_LIFECYCLE_REQUESTS.has(requestType)) {
+    throw createLifecycleValidationError(`Runtime lifecycle request ${requestType} is not supported.`, {
+      field: 'requestType',
+      allowedValues: [...ALLOWED_RUNTIME_LIFECYCLE_REQUESTS]
+    });
+  }
+
+  if (lifecycleEnvelope.reason !== undefined && (typeof lifecycleEnvelope.reason !== 'string' || lifecycleEnvelope.reason.trim().length === 0)) {
+    throw createLifecycleValidationError('Runtime lifecycle field reason must be omitted or be a non-empty string.', {
+      field: 'reason'
+    });
+  }
+
+  return {
+    requestType,
+    reason: typeof lifecycleEnvelope.reason === 'string' ? lifecycleEnvelope.reason.trim() : null
   };
 }
 
@@ -220,6 +268,19 @@ function createCommandRecord(commandEnvelope, activationRecord, commandResult, d
   };
 }
 
+function createLifecycleRequestRecord(requestEnvelope, previousLifecycleState, nextLifecycleState, requestedAt, dispatchOwner, targetOwner) {
+  return {
+    requestId: createId('runtime-lifecycle-request'),
+    requestType: requestEnvelope.requestType,
+    reason: requestEnvelope.reason,
+    requestedAt,
+    previousLifecycleState,
+    nextLifecycleState,
+    dispatchOwner,
+    targetOwner
+  };
+}
+
 function createHelperCrashDiagnostic(slotId, helperPackageId, failure) {
   return {
     level: 'warning',
@@ -269,6 +330,16 @@ function createHelperSlotNotBoundError(activationId, slotId) {
   return error;
 }
 
+function createRouteActivationLifecycleConflictError(lifecycleState) {
+  const error = new Error(`Runtime lifecycle state ${lifecycleState} is not accepting new route activations.`);
+  error.code = 'runtime-lifecycle-not-accepting-activations';
+  error.statusCode = 409;
+  error.details = {
+    lifecycleState
+  };
+  return error;
+}
+
 export function createRuntimeSupervisor({
   manifestRegistry,
   now = () => new Date(),
@@ -289,10 +360,13 @@ export function createRuntimeSupervisor({
     lastReleasedAt: null,
     lastCommandAt: null,
     lastCrashAt: null,
+    lastLifecycleRequestAt: null,
     commandDispatchCount: 0,
     crashCount: 0,
+    lifecycleRequestCount: 0,
     lastCommand: null,
     lastCrash: null,
+    lastLifecycleRequest: null,
     manifestRegistry: null,
     activeRouteActivations: [],
     lastFailure: null,
@@ -326,14 +400,18 @@ export function createRuntimeSupervisor({
       lastReleasedAt: state.lastReleasedAt,
       lastCommandAt: state.lastCommandAt,
       lastCrashAt: state.lastCrashAt,
+      lastLifecycleRequestAt: state.lastLifecycleRequestAt,
       commandDispatchCount: state.commandDispatchCount,
       crashCount: state.crashCount,
+      lifecycleRequestCount: state.lifecycleRequestCount,
+      acceptingRouteActivations: state.readiness === 'ready' && state.lifecycleState === 'running',
       lastCommand: state.lastCommand ? {
         ...state.lastCommand,
         result: state.lastCommand.result && typeof state.lastCommand.result === 'object'
           ? { ...state.lastCommand.result }
           : state.lastCommand.result
       } : null,
+      lastLifecycleRequest: state.lastLifecycleRequest ? { ...state.lastLifecycleRequest } : null,
       lastCrash: state.lastCrash ? {
         ...state.lastCrash,
         failure: state.lastCrash.failure ? { ...state.lastCrash.failure } : null,
@@ -426,6 +504,9 @@ export function createRuntimeSupervisor({
       return getStatus();
     },
     async activateRoute(activateRoute) {
+      if (state.lifecycleState !== 'running') {
+        throw createRouteActivationLifecycleConflictError(state.lifecycleState);
+      }
       const activation = await activateRoute();
       const record = createActivationRecord(activation);
       state.activeRouteActivations = [
@@ -518,6 +599,78 @@ export function createRuntimeSupervisor({
         });
         throw error;
       }
+    },
+    requestLifecycle(lifecycleEnvelope) {
+      const normalizedRequest = ensureLifecycleRequestEnvelope(lifecycleEnvelope);
+      const previousLifecycleState = state.lifecycleState;
+      let nextLifecycleState = previousLifecycleState;
+
+      if (state.readiness !== 'ready') {
+        throw createLifecycleConflictError(
+          `Runtime lifecycle requests cannot be applied while the supervisor is ${state.readiness}.`,
+          {
+            requestType: normalizedRequest.requestType,
+            lifecycleState: state.lifecycleState,
+            readiness: state.readiness
+          }
+        );
+      }
+
+      if (normalizedRequest.requestType === 'drain') {
+        if (state.lifecycleState !== 'running') {
+          throw createLifecycleConflictError('Runtime drain requests are only accepted while the supervisor is running.', {
+            requestType: normalizedRequest.requestType,
+            lifecycleState: state.lifecycleState
+          });
+        }
+        nextLifecycleState = 'draining';
+      }
+      else if (normalizedRequest.requestType === 'resume') {
+        if (!['draining', 'stop-requested'].includes(state.lifecycleState)) {
+          throw createLifecycleConflictError('Runtime resume requests are only accepted from draining or stop-requested state.', {
+            requestType: normalizedRequest.requestType,
+            lifecycleState: state.lifecycleState
+          });
+        }
+        nextLifecycleState = 'running';
+      }
+      else if (normalizedRequest.requestType === 'stop-requested') {
+        if (!['running', 'draining'].includes(state.lifecycleState)) {
+          throw createLifecycleConflictError('Runtime stop-requested requests are only accepted from running or draining state.', {
+            requestType: normalizedRequest.requestType,
+            lifecycleState: state.lifecycleState
+          });
+        }
+        nextLifecycleState = 'stop-requested';
+      }
+
+      const requestedAt = timestamp(now);
+      state.lifecycleState = nextLifecycleState;
+      state.lastLifecycleRequestAt = requestedAt;
+      state.lifecycleRequestCount += 1;
+      const requestRecord = createLifecycleRequestRecord(
+        normalizedRequest,
+        previousLifecycleState,
+        nextLifecycleState,
+        requestedAt,
+        state.owner,
+        state.targetOwner
+      );
+      state.lastLifecycleRequest = requestRecord;
+
+      recordEvent('lifecycle-requested', {
+        requestId: requestRecord.requestId,
+        requestType: requestRecord.requestType,
+        previousLifecycleState,
+        nextLifecycleState
+      });
+      recordEvent(`runtime-${requestRecord.requestType}`, {
+        requestId: requestRecord.requestId,
+        previousLifecycleState,
+        nextLifecycleState
+      });
+
+      return requestRecord;
     },
     listRouteActivations() {
       return getStatus().activeRouteActivations;
