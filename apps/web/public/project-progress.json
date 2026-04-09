@@ -1,10 +1,10 @@
 {
   "title": "Project Pulse",
-  "capturedAt": "2026-04-09T15:46:00+09:00",
-  "capturedAtLabel": "Reviewed Apr 9, 2026, 15:46 JST",
-  "summary": "Issue #57 has moved forward again: the runtime supervisor now owns active route-activation state, additive list and release APIs are implemented behind the existing HTTP contract, the health surface shows active runtime route ownership directly, and the NEXUS project board is no longer GraphQL-blocked.",
-  "source": "GitHub-first NEXUS truth sweep after the issue #56 closure and project-board recovery, plus verified branch coverage for supervisor-owned route activation state and operator-visible runtime health updates.",
-  "nextAction": "Publish the active #57 runtime-ownership delta, keep the new health-surface visibility truthful in the client, and continue the deeper native-runtime ownership seam behind the supervisor boundary.",
+  "capturedAt": "2026-04-10T01:35:22+09:00",
+  "capturedAtLabel": "Reviewed Apr 10, 2026, 01:35 JST",
+  "summary": "Issue #57 has moved forward again: the runtime supervisor now owns active route-command dispatch and lifecycle transitions in addition to retained route activations, the health surface shows command ownership directly, and the NEXUS project board remains aligned with repo truth.",
+  "source": "GitHub-first NEXUS truth sweep on Apr 10, 2026 JST, plus verified branch coverage for supervisor-owned runtime command dispatch, lifecycle control, and operator-visible health updates.",
+  "nextAction": "Publish the active #57 command-dispatch delta, keep the new health-surface visibility truthful in the client, and continue the deeper runtime event and crash-isolation seam behind the supervisor boundary.",
   "lanes": [
     {
       "kind": "PR",
@@ -33,7 +33,7 @@
       "ref": "#54",
       "status": "done",
       "title": "Desktop readiness validation",
-      "summary": "Continuity validation closed cleanly on the Electron and Node baseline, and the merged repo remains green with 79 out of 79 automated checks after the later surface-activation coverage landed.",
+      "summary": "Continuity validation closed cleanly on the Electron and Node baseline, and the merged repo remains green with 83 out of 83 automated checks after the later runtime command-dispatch coverage landed.",
       "nextAction": "Use the verified baseline as the migration source for the next runtime-topology work.",
       "artifacts": [
         {
@@ -183,8 +183,8 @@
       "ref": "#57",
       "status": "execute-now",
       "title": "Packaging and runtime topology",
-      "summary": "With #56 shipped, the runtime-topology lane is active again. The degraded runtime supervisor seam now retains active route-activation state, exposes additive list and release APIs, and surfaces active runtime-route ownership in health without breaking the current HTTP contract.",
-      "nextAction": "Publish the active runtime-ownership delta, then continue moving lifecycle and activation ownership behind the supervisor seam.",
+      "summary": "With #56 shipped, the runtime-topology lane is active again. The degraded runtime supervisor seam now retains active route-activation state, owns additive runtime command dispatch and lifecycle transitions, and surfaces both route and command ownership in health without breaking the current HTTP contract.",
+      "nextAction": "Publish the active runtime command-dispatch delta, then continue moving runtime events and crash-isolation ownership behind the supervisor seam.",
       "artifacts": [
         {
           "label": "First migration seam record",
@@ -208,6 +208,10 @@
         },
         {
           "label": "Runtime activation service surface",
+          "path": "apps/service/src/server.mjs"
+        },
+        {
+          "label": "Runtime command service surface",
           "path": "apps/service/src/server.mjs"
         },
         {

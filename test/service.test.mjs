@@ -44,6 +44,9 @@ test('service boots and exposes the seeded internal channel map', async () => {
     assert.equal(health.runtime.readiness, 'ready');
     assert.equal(health.runtime.backingImplementation, 'in-process-store');
     assert.equal(health.runtime.lifecycleState, 'running');
+    assert.equal(health.runtime.lastCommandAt, null);
+    assert.equal(health.runtime.commandDispatchCount, 0);
+    assert.equal(health.runtime.lastCommand, null);
     assert.equal(health.runtime.activeRouteActivationCount, 0);
     assert.deepEqual(health.runtime.activeRouteActivations, []);
     assert.equal(health.runtime.manifestRegistry.surfacePackageCount, 4);
@@ -353,6 +356,72 @@ test('route activation is retained as supervisor-owned runtime state and can be 
   });
 });
 
+test('runtime command dispatch is retained as supervisor-owned lifecycle state', async () => {
+  await withService(async (service) => {
+    const activation = await fetch(`${service.url}/api/runtime/route-activations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        workspaceId: 'workspace-internal-core',
+        surfaceKind: 'thread',
+        scopeId: 'thread-roadmap-71',
+        surfacePackageId: 'nexus.surface.thread',
+        routeCapabilities: [
+          'conversation.read',
+          'message.compose'
+        ],
+        helperSlotRequests: []
+      })
+    }).then((response) => response.json());
+
+    const commandResponse = await fetch(`${service.url}/api/runtime/route-activations/commands`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        activationId: activation.activationId,
+        commandType: 'set-lifecycle-state',
+        requiredCapability: 'conversation.read',
+        targetLifecycleState: 'background',
+        payload: {
+          reason: 'operator-opened-another-surface'
+        }
+      })
+    });
+    const command = await commandResponse.json();
+
+    assert.equal(commandResponse.status, 200);
+    assert.match(command.commandId, /^runtime-command-/);
+    assert.equal(command.activationId, activation.activationId);
+    assert.equal(command.commandType, 'set-lifecycle-state');
+    assert.equal(command.targetLifecycleState, 'background');
+    assert.equal(command.dispatchOwner, 'node-runtime-supervisor');
+    assert.equal(command.targetOwner, 'native-runtime-supervisor');
+    assert.equal(command.result.accepted, true);
+    assert.equal(command.result.handlingMode, 'transition-adapter');
+    assert.equal(command.result.surfacePackageId, 'nexus.surface.thread');
+    assert.deepEqual(command.result.echoedPayload, {
+      reason: 'operator-opened-another-surface'
+    });
+
+    const activeActivations = await fetch(`${service.url}/api/runtime/route-activations`).then((response) => response.json());
+    assert.equal(activeActivations.length, 1);
+    assert.equal(activeActivations[0].activationId, activation.activationId);
+    assert.equal(activeActivations[0].lifecycleState, 'background');
+    assert.equal(activeActivations[0].commandDispatchCount, 1);
+    assert.equal(activeActivations[0].lastCommand.commandId, command.commandId);
+    assert.equal(activeActivations[0].lastCommand.targetLifecycleState, 'background');
+    assert.equal(activeActivations[0].lastCommandFailure, null);
+
+    const health = await fetch(`${service.url}/api/health`).then((response) => response.json());
+    assert.equal(health.runtime.commandDispatchCount, 1);
+    assert.equal(health.runtime.lastCommand.commandId, command.commandId);
+    assert.equal(health.runtime.activeRouteActivations[0].lifecycleState, 'background');
+    assert(health.runtime.supervisor.recentEvents.some((event) => event.type === 'command-dispatch-started'));
+    assert(health.runtime.supervisor.recentEvents.some((event) => event.type === 'command-dispatched'));
+  });
+});
+
 test('releasing an unknown runtime activation returns a stable not-found error', async () => {
   await withService(async (service) => {
     const releaseResponse = await fetch(
@@ -364,6 +433,67 @@ test('releasing an unknown runtime activation returns a stable not-found error',
     assert.equal(releaseResponse.status, 404);
     assert.equal(body.code, 'runtime-activation-not-found');
     assert.equal(body.details.activationId, 'route-activation-missing');
+  });
+});
+
+test('runtime command dispatch rejects unsupported capability use and invalid payloads', async () => {
+  await withService(async (service) => {
+    const activation = await fetch(`${service.url}/api/runtime/route-activations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        workspaceId: 'workspace-internal-core',
+        surfaceKind: 'thread',
+        scopeId: 'thread-roadmap-71',
+        surfacePackageId: 'nexus.surface.thread',
+        routeCapabilities: [
+          'conversation.read'
+        ],
+        helperSlotRequests: []
+      })
+    }).then((response) => response.json());
+
+    const deniedResponse = await fetch(`${service.url}/api/runtime/route-activations/commands`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        activationId: activation.activationId,
+        commandType: 'set-lifecycle-state',
+        requiredCapability: 'runtime.admin',
+        targetLifecycleState: 'suspended'
+      })
+    });
+    const denied = await deniedResponse.json();
+    assert.equal(deniedResponse.status, 403);
+    assert.equal(denied.code, 'runtime-command-capability-denied');
+    assert.equal(denied.details.activationId, activation.activationId);
+    assert.equal(denied.details.requiredCapability, 'runtime.admin');
+
+    const invalidResponse = await fetch(`${service.url}/api/runtime/route-activations/commands`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        activationId: activation.activationId,
+        commandType: '',
+        targetLifecycleState: 'invalid-state'
+      })
+    });
+    const invalid = await invalidResponse.json();
+    assert.equal(invalidResponse.status, 400);
+    assert.equal(invalid.code, 'runtime-command-invalid');
+
+    const missingResponse = await fetch(`${service.url}/api/runtime/route-activations/commands`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        activationId: 'route-activation-missing',
+        commandType: 'refresh-surface'
+      })
+    });
+    const missing = await missingResponse.json();
+    assert.equal(missingResponse.status, 404);
+    assert.equal(missing.code, 'runtime-activation-not-found');
   });
 });
 

@@ -216,6 +216,17 @@ async function routeApi(request, response, runtimeAdapter, config) {
     return sendJson(request, response, config, 200, runtimeAdapter.listRouteActivations());
   }
 
+  if (request.method === 'POST' && url.pathname === '/api/runtime/route-activations/commands') {
+    const commandEnvelope = await readBody(request);
+    return sendJson(
+      request,
+      response,
+      config,
+      200,
+      await runtimeAdapter.dispatchRouteCommand(commandEnvelope.activationId, commandEnvelope)
+    );
+  }
+
   if (request.method === 'DELETE' && url.pathname === '/api/runtime/route-activations') {
     return sendJson(
       request,
