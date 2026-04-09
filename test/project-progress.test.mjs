@@ -10,6 +10,7 @@ test('summarizeProjectPulse counts lane states and selects the execute-now focus
   const summary = summarizeProjectPulse({
     title: 'Project Pulse',
     lanes: [
+      { ref: '#58', status: 'done', nextAction: 'Keep the shipped surface truthful.' },
       { ref: '#57', status: 'in-progress', nextAction: 'Continue topology work.' },
       { ref: '#54', status: 'execute-now', nextAction: 'Write back readiness findings.' },
       { ref: '#56', status: 'queued', nextAction: 'Wait for runtime topology.' },
@@ -19,7 +20,8 @@ test('summarizeProjectPulse counts lane states and selects the execute-now focus
 
   assert.equal(summary.focusLane?.ref, '#54');
   assert.deepEqual(summary.counts, {
-    total: 4,
+    total: 5,
+    done: 1,
     executeNow: 1,
     inProgress: 1,
     queued: 1,
@@ -42,6 +44,10 @@ test('summarizeProjectPulse falls back to the first in-progress lane when no exe
 });
 
 test('projectPulseStatusMeta exposes readable labels and a safe fallback', () => {
+  assert.deepEqual(projectPulseStatusMeta('done'), {
+    label: 'Done',
+    tone: 'done'
+  });
   assert.deepEqual(projectPulseStatusMeta('queued'), {
     label: 'Queued',
     tone: 'queued'

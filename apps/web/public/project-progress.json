@@ -1,34 +1,42 @@
 {
   "title": "Project Pulse",
-  "capturedAt": "2026-04-09T13:10:00+09:00",
+  "capturedAt": "2026-04-09T13:10:55+09:00",
   "capturedAtLabel": "Reviewed Apr 9, 2026, 13:10 JST",
-  "summary": "The Electron-managed continuity baseline is validated and ready for operator-facing visibility work while the longer-term native-runtime lanes stay explicit.",
-  "source": "GitHub-first NEXUS truth sweep plus issue #54 readiness validation.",
-  "nextAction": "Write back the continuity-validation evidence, keep the current baseline readable, and then continue README and runtime-topology follow-on work without blurring the stack boundary.",
+  "summary": "The continuity baseline is now merged on main, and the active NEXUS engineering lane has shifted to the first native-runtime topology pass in issue #57.",
+  "source": "GitHub-first NEXUS truth sweep after PR #58 merge and issue #54 closure.",
+  "nextAction": "Define the first concrete host/runtime split for the native runtime, Avalonia host, interop boundary, and child-surface packaging while keeping the Electron baseline explicit as the migration source.",
   "lanes": [
+    {
+      "kind": "PR",
+      "ref": "#58",
+      "status": "done",
+      "title": "Project Pulse operator surface",
+      "summary": "The right-rail Project Pulse and readable runtime-health surface shipped to main and now anchor operator-visible progress and readiness in the client.",
+      "nextAction": "Keep the snapshot truthful as active NEXUS lanes move."
+    },
     {
       "kind": "Issue",
       "ref": "#54",
-      "status": "execute-now",
+      "status": "done",
       "title": "Desktop readiness validation",
-      "summary": "Continuity validation is green on the current Electron and Node baseline, with 72 out of 72 automated checks passing in the issue-54 lane.",
-      "nextAction": "Keep the baseline diagnosable and turn the findings into operator-visible readiness and progress cues."
+      "summary": "Continuity validation closed cleanly after the current Electron and Node baseline passed 72 out of 72 automated checks and the operator-readability slice landed.",
+      "nextAction": "Use the verified baseline as the migration source for the next runtime-topology work."
+    },
+    {
+      "kind": "Issue",
+      "ref": "#57",
+      "status": "execute-now",
+      "title": "Packaging and runtime topology",
+      "summary": "Native-C-first topology is now the active engineering lane, with Avalonia host responsibilities, native runtime ownership, and interop boundaries needing explicit first-pass definition.",
+      "nextAction": "Define the first concrete host/runtime split and the package boundaries for channel, forum, thread, timeline, and direct surfaces."
     },
     {
       "kind": "PR",
       "ref": "#55",
       "status": "in-progress",
       "title": "README direction clarification",
-      "summary": "The repo README already distinguishes the current Electron baseline from the approved future native-C plus Avalonia direction, but the open PR still needs reconciliation and landing.",
-      "nextAction": "Carry the verified issue-54 findings into the PR review and land the clarification without reopening the stack decision."
-    },
-    {
-      "kind": "Issue",
-      "ref": "#57",
-      "status": "in-progress",
-      "title": "Packaging and runtime topology",
-      "summary": "Native-C-first topology design remains active, with the continuity baseline explicitly preserved as the migration starting point rather than the target stack.",
-      "nextAction": "Continue the runtime-boundary definition after the current baseline findings and writeback are captured."
+      "summary": "The README clarification lane remains open so the current Electron baseline and the target native-C plus Avalonia direction stay explicitly separated.",
+      "nextAction": "Land the clarification without mixing issue-57 topology work back into the README-only lane."
     },
     {
       "kind": "Issue",
@@ -36,7 +44,7 @@
       "status": "queued",
       "title": "Conversation-surface program model",
       "summary": "The child-program and embedded-helper surface model is queued behind the continuity-validation and runtime-topology work already in flight.",
-      "nextAction": "Unblock this lane after the current operator baseline and runtime topology decisions are recorded."
+      "nextAction": "Unblock this lane after the first runtime-topology split is recorded."
     },
     {
       "kind": "Issue",

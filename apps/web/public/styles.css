@@ -671,6 +671,10 @@ button:disabled {
   background: rgba(11, 122, 86, 0.12);
 }
 
+.project-pulse-stat-done {
+  background: rgba(15, 107, 90, 0.08);
+}
+
 .project-pulse-stat-in-progress {
   background: rgba(15, 107, 90, 0.1);
 }
@@ -711,6 +715,7 @@ button:disabled {
   align-items: center;
 }
 
+.pulse-pill-done,
 .pulse-pill-execute-now,
 .pulse-pill-success {
   background: rgba(11, 122, 86, 0.14);

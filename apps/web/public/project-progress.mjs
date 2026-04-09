@@ -1,4 +1,8 @@
 const STATUS_META = {
+  done: {
+    label: 'Done',
+    tone: 'done'
+  },
   'execute-now': {
     label: 'Execute now',
     tone: 'execute-now'
@@ -28,6 +32,7 @@ export function summarizeProjectPulse(snapshot = {}) {
   const lanes = Array.isArray(snapshot.lanes) ? snapshot.lanes : [];
   const counts = {
     total: lanes.length,
+    done: 0,
     executeNow: 0,
     inProgress: 0,
     queued: 0,
@@ -35,7 +40,10 @@ export function summarizeProjectPulse(snapshot = {}) {
   };
 
   for (const lane of lanes) {
-    if (lane?.status === 'execute-now') {
+    if (lane?.status === 'done') {
+      counts.done += 1;
+    }
+    else if (lane?.status === 'execute-now') {
       counts.executeNow += 1;
     }
     else if (lane?.status === 'in-progress') {
