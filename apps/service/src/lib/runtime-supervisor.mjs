@@ -17,6 +17,64 @@ function normalizeFailure(error, at) {
   };
 }
 
+function summarizeHelperSlot(slot) {
+  return {
+    slotId: slot.slotId,
+    status: slot.status,
+    helperPackageId: slot.helper?.packageId ?? null,
+    sourceRuntime: slot.helper?.sourceRuntime ?? null
+  };
+}
+
+function summarizeDiagnostic(diagnostic) {
+  return {
+    level: diagnostic.level ?? 'warning',
+    code: diagnostic.code ?? 'runtime-activation-diagnostic',
+    slotId: diagnostic.slotId ?? null,
+    helperPackageId: diagnostic.helperPackageId ?? null,
+    message: diagnostic.message ?? 'Runtime activation diagnostic.'
+  };
+}
+
+function createActivationRecord(activation) {
+  return {
+    activationId: activation.activationId,
+    activatedAt: activation.activatedAt,
+    route: {
+      actorId: activation.route.actorId,
+      workspaceId: activation.route.workspaceId,
+      surfaceKind: activation.route.surfaceKind,
+      scopeId: activation.route.scopeId,
+      selectedMessageId: activation.route.selectedMessageId,
+      surfacePackageId: activation.route.surfacePackageId
+    },
+    surface: {
+      packageId: activation.surface.packageId,
+      displayName: activation.surface.displayName,
+      surfaceKind: activation.surface.surfaceKind,
+      manifestVersion: activation.surface.manifestVersion,
+      abiVersion: activation.surface.abiVersion,
+      entrypoint: activation.surface.entrypoint
+    },
+    helperSlots: Array.isArray(activation.helperSlots)
+      ? activation.helperSlots.map(summarizeHelperSlot)
+      : [],
+    diagnostics: Array.isArray(activation.diagnostics)
+      ? activation.diagnostics.map(summarizeDiagnostic)
+      : []
+  };
+}
+
+function createActivationNotFoundError(activationId) {
+  const error = new Error(`Runtime activation ${activationId} is not active.`);
+  error.code = 'runtime-activation-not-found';
+  error.statusCode = 404;
+  error.details = {
+    activationId
+  };
+  return error;
+}
+
 export function createRuntimeSupervisor({
   manifestRegistry,
   now = () => new Date(),
@@ -33,7 +91,10 @@ export function createRuntimeSupervisor({
     startedAt: null,
     failedAt: null,
     stoppedAt: null,
+    lastActivatedAt: null,
+    lastReleasedAt: null,
     manifestRegistry: null,
+    activeRouteActivations: [],
     lastFailure: null,
     recentEvents: []
   };
@@ -61,7 +122,17 @@ export function createRuntimeSupervisor({
       startedAt: state.startedAt,
       failedAt: state.failedAt,
       stoppedAt: state.stoppedAt,
+      lastActivatedAt: state.lastActivatedAt,
+      lastReleasedAt: state.lastReleasedAt,
       manifestRegistry: state.manifestRegistry,
+      activeRouteActivationCount: state.activeRouteActivations.length,
+      activeRouteActivations: state.activeRouteActivations.map((activation) => ({
+        ...activation,
+        route: { ...activation.route },
+        surface: { ...activation.surface },
+        helperSlots: activation.helperSlots.map((slot) => ({ ...slot })),
+        diagnostics: activation.diagnostics.map((diagnostic) => ({ ...diagnostic }))
+      })),
       lastFailure: state.lastFailure,
       recentEvents: [...state.recentEvents]
     };
@@ -109,11 +180,56 @@ export function createRuntimeSupervisor({
 
       state.lifecycleState = 'stopping';
       recordEvent('stop-attempt');
+      const clearedActivationCount = state.activeRouteActivations.length;
+      state.activeRouteActivations = [];
       state.stoppedAt = timestamp(now);
       state.lifecycleState = 'stopped';
       state.readiness = state.lastFailure ? 'degraded' : 'stopped';
+      if (clearedActivationCount > 0) {
+        recordEvent('route-activations-cleared', {
+          count: clearedActivationCount
+        });
+      }
       recordEvent('stopped');
       return getStatus();
+    },
+    async activateRoute(activateRoute) {
+      const activation = await activateRoute();
+      const record = createActivationRecord(activation);
+      state.activeRouteActivations = [
+        ...state.activeRouteActivations.filter((entry) => entry.activationId !== record.activationId),
+        record
+      ];
+      state.lastActivatedAt = record.activatedAt;
+      recordEvent('route-activated', {
+        activationId: record.activationId,
+        surfaceKind: record.route.surfaceKind,
+        surfacePackageId: record.surface.packageId,
+        degradedHelperSlotCount: record.helperSlots.filter((slot) => slot.status === 'degraded').length
+      });
+      return activation;
+    },
+    listRouteActivations() {
+      return getStatus().activeRouteActivations;
+    },
+    releaseRouteActivation(activationId) {
+      const recordIndex = state.activeRouteActivations.findIndex((entry) => entry.activationId === activationId);
+      if (recordIndex === -1) {
+        throw createActivationNotFoundError(activationId);
+      }
+
+      const [record] = state.activeRouteActivations.splice(recordIndex, 1);
+      const releasedAt = timestamp(now);
+      state.lastReleasedAt = releasedAt;
+      recordEvent('route-released', {
+        activationId,
+        surfaceKind: record.route.surfaceKind,
+        surfacePackageId: record.surface.packageId
+      });
+      return {
+        ...record,
+        releasedAt
+      };
     },
     isReady() {
       return state.readiness === 'ready';

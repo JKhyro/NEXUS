@@ -23,6 +23,10 @@ function createRuntimeHealthSnapshot(config, runtimeState, store, supervisorStat
       readiness: supervisorStatus.readiness,
       lifecycleState: supervisorStatus.lifecycleState,
       startedAt: supervisorStatus.startedAt,
+      lastActivatedAt: supervisorStatus.lastActivatedAt,
+      lastReleasedAt: supervisorStatus.lastReleasedAt,
+      activeRouteActivationCount: supervisorStatus.activeRouteActivationCount,
+      activeRouteActivations: supervisorStatus.activeRouteActivations,
       manifestRegistry: supervisorStatus.manifestRegistry,
       supervisor: supervisorStatus
     }
@@ -70,7 +74,13 @@ export function createInProcessRuntimeAdapter({
       if (!runtimeSupervisor.isReady()) {
         throw createRuntimeSupervisorNotReadyError(runtimeSupervisor.getStatus());
       }
-      return manifestRegistry.activateRoute(routeEnvelope);
+      return runtimeSupervisor.activateRoute(() => manifestRegistry.activateRoute(routeEnvelope));
+    },
+    listRouteActivations() {
+      return runtimeSupervisor.listRouteActivations();
+    },
+    releaseRouteActivation(activationId) {
+      return runtimeSupervisor.releaseRouteActivation(activationId);
     },
     getBootstrapSummary() {
       return store.getBootstrapSummary();

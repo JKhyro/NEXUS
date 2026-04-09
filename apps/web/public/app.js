@@ -1581,6 +1581,20 @@ function summarizeServiceStorage(health) {
   return 'Storage mode unavailable';
 }
 
+function summarizeActiveRouteActivations(health) {
+  const count = Number(health?.runtime?.activeRouteActivationCount ?? 0);
+  return `${count} active`;
+}
+
+function summarizeLastRuntimeActivation(health) {
+  const lastActivatedAt = health?.runtime?.lastActivatedAt ?? null;
+  if (!lastActivatedAt) {
+    return 'No active runtime route yet';
+  }
+
+  return `Last activated ${formatTimestamp(lastActivatedAt)}`;
+}
+
 function currentRouteActivationRequest() {
   const directConversation = currentDirectConversation();
   if (directConversation) {
@@ -1855,7 +1869,7 @@ function renderHealth() {
       <span class="pill pulse-pill pulse-pill-${supervisorTone}">${escapeHtml(summarizeSupervisorLabel(supervisor))}</span>
       <span class="project-pulse-stamp">${escapeHtml(state.health.contractVersion ?? 'Contract version unavailable')}</span>
     </div>
-    <p class="service-health-copy">Current desktop baseline is running in <strong>${escapeHtml(state.health.mode ?? 'unknown mode')}</strong> with <strong>${escapeHtml(summarizeServiceStorage(state.health))}</strong> storage, and the runtime seam is currently <strong>${escapeHtml(runtime.readiness ?? 'unknown')}</strong>.</p>
+    <p class="service-health-copy">Current desktop baseline is running in <strong>${escapeHtml(state.health.mode ?? 'unknown mode')}</strong> with <strong>${escapeHtml(summarizeServiceStorage(state.health))}</strong> storage, the runtime seam is currently <strong>${escapeHtml(runtime.readiness ?? 'unknown')}</strong>, and the supervisor owns <strong>${escapeHtml(summarizeActiveRouteActivations(state.health))}</strong>.</p>
     <div class="service-health-grid">
       <div class="service-health-metric">
         <span class="eyebrow">Deployment</span>
@@ -1876,6 +1890,14 @@ function renderHealth() {
       <div class="service-health-metric">
         <span class="eyebrow">Startup attempts</span>
         <strong>${escapeHtml(String(supervisor?.startupAttemptCount ?? 0))}</strong>
+      </div>
+      <div class="service-health-metric">
+        <span class="eyebrow">Active routes</span>
+        <strong>${escapeHtml(summarizeActiveRouteActivations(state.health))}</strong>
+      </div>
+      <div class="service-health-metric service-health-metric-wide">
+        <span class="eyebrow">Last activation</span>
+        <strong>${escapeHtml(summarizeLastRuntimeActivation(state.health))}</strong>
       </div>
       <div class="service-health-metric service-health-metric-wide">
         <span class="eyebrow">Supervisor event</span>
