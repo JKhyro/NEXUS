@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import { CONTRACT_VERSION } from '../../../packages/contracts/src/index.mjs';
 import { resolveServiceConfig } from './lib/config.mjs';
+import { createInProcessRuntimeAdapter } from './lib/runtime-adapter.mjs';
 import { createStore } from './lib/store-factory.mjs';
 
 const mimeTypes = {
@@ -76,7 +77,7 @@ async function serveStatic(request, staticDir, pathname, response, config) {
   response.end(body);
 }
 
-async function routeApi(request, response, store, config) {
+async function routeApi(request, response, runtimeAdapter, config) {
   const url = new URL(request.url, `http://${request.headers.host ?? `${config.host}:${config.port}`}`);
   const actorId = url.searchParams.get('actorId');
 
@@ -87,62 +88,49 @@ async function routeApi(request, response, store, config) {
   }
 
   if (request.method === 'GET' && url.pathname === '/api/health') {
-    return sendJson(request, response, config, 200, {
-      status: 'ok',
-      contractVersion: CONTRACT_VERSION,
-      mode: config.deploymentMode === 'hosted' ? 'hosted-capable' : 'desktop-local-first',
-      deploymentMode: config.deploymentMode,
-      staticMode: config.staticMode,
-      publicOrigin: config.publicOrigin,
-      allowedOrigins: config.allowedOrigins,
-      storageMode: config.storageMode,
-      storage: {
-        metabasePath: store.metabasePath,
-        chatbasePath: store.chatbasePath
-      }
-    });
+    return sendJson(request, response, config, 200, runtimeAdapter.getHealthSnapshot());
   }
 
   if (request.method === 'GET' && url.pathname === '/api/bootstrap') {
-    return sendJson(request, response, config, 200, store.getBootstrapSummary());
+    return sendJson(request, response, config, 200, runtimeAdapter.getBootstrapSummary());
   }
 
   if (request.method === 'GET' && url.pathname === '/api/identities') {
-    return sendJson(request, response, config, 200, store.listIdentities());
+    return sendJson(request, response, config, 200, runtimeAdapter.listIdentities());
   }
 
   if (request.method === 'GET' && url.pathname === '/api/workspaces') {
-    return sendJson(request, response, config, 200, store.listWorkspaces(actorId));
+    return sendJson(request, response, config, 200, runtimeAdapter.listWorkspaces(actorId));
   }
 
   if (request.method === 'GET' && url.pathname === '/api/channels') {
-    return sendJson(request, response, config, 200, store.listChannels(actorId, url.searchParams.get('workspaceId')));
+    return sendJson(request, response, config, 200, runtimeAdapter.listChannels(actorId, url.searchParams.get('workspaceId')));
   }
 
   if (request.method === 'GET' && url.pathname === '/api/direct-conversations') {
-    return sendJson(request, response, config, 200, store.listDirectConversations(actorId));
+    return sendJson(request, response, config, 200, runtimeAdapter.listDirectConversations(actorId));
   }
 
   if (request.method === 'GET' && url.pathname === '/api/activity') {
-    return sendJson(request, response, config, 200, store.listActivity(
+    return sendJson(request, response, config, 200, runtimeAdapter.listActivity(
       actorId,
       url.searchParams.get('workspaceId')
     ));
   }
 
   if (request.method === 'GET' && url.pathname === '/api/posts') {
-    return sendJson(request, response, config, 200, store.listPosts(actorId, url.searchParams.get('channelId')));
+    return sendJson(request, response, config, 200, runtimeAdapter.listPosts(actorId, url.searchParams.get('channelId')));
   }
 
   if (request.method === 'GET' && url.pathname === '/api/threads') {
-    return sendJson(request, response, config, 200, store.listThreads(actorId, {
+    return sendJson(request, response, config, 200, runtimeAdapter.listThreads(actorId, {
       channelId: url.searchParams.get('channelId'),
       postId: url.searchParams.get('postId')
     }));
   }
 
   if (request.method === 'GET' && url.pathname === '/api/messages') {
-    return sendJson(request, response, config, 200, store.listMessages(
+    return sendJson(request, response, config, 200, runtimeAdapter.listMessages(
       actorId,
       url.searchParams.get('scopeType'),
       url.searchParams.get('scopeId')
@@ -150,14 +138,14 @@ async function routeApi(request, response, store, config) {
   }
 
   if (request.method === 'GET' && url.pathname === '/api/message') {
-    return sendJson(request, response, config, 200, store.getMessage(
+    return sendJson(request, response, config, 200, runtimeAdapter.getMessage(
       actorId,
       url.searchParams.get('messageId')
     ));
   }
 
   if (request.method === 'GET' && url.pathname === '/api/relays') {
-    return sendJson(request, response, config, 200, store.listRelays(
+    return sendJson(request, response, config, 200, runtimeAdapter.listRelays(
       actorId,
       url.searchParams.get('scopeType'),
       url.searchParams.get('scopeId')
@@ -165,7 +153,7 @@ async function routeApi(request, response, store, config) {
   }
 
   if (request.method === 'GET' && url.pathname === '/api/handoffs') {
-    return sendJson(request, response, config, 200, store.listHandoffs(
+    return sendJson(request, response, config, 200, runtimeAdapter.listHandoffs(
       actorId,
       url.searchParams.get('scopeType'),
       url.searchParams.get('scopeId')
@@ -173,11 +161,11 @@ async function routeApi(request, response, store, config) {
   }
 
   if (request.method === 'GET' && url.pathname === '/api/search') {
-    return sendJson(request, response, config, 200, store.searchMessages(actorId, url.searchParams.get('q') ?? ''));
+    return sendJson(request, response, config, 200, runtimeAdapter.searchMessages(actorId, url.searchParams.get('q') ?? ''));
   }
 
   if (request.method === 'GET' && url.pathname === '/api/external-references') {
-    return sendJson(request, response, config, 200, store.listExternalReferences(
+    return sendJson(request, response, config, 200, runtimeAdapter.listExternalReferences(
       actorId,
       url.searchParams.get('ownerType'),
       url.searchParams.get('ownerId')
@@ -185,7 +173,7 @@ async function routeApi(request, response, store, config) {
   }
 
   if (request.method === 'GET' && url.pathname === '/api/external-reference-links') {
-    return sendJson(request, response, config, 200, store.listExternalReferenceLinks(
+    return sendJson(request, response, config, 200, runtimeAdapter.listExternalReferenceLinks(
       actorId,
       url.searchParams.get('system'),
       url.searchParams.get('externalId')
@@ -193,35 +181,35 @@ async function routeApi(request, response, store, config) {
   }
 
   if (request.method === 'POST' && url.pathname === '/api/messages') {
-    return sendJson(request, response, config, 201, await store.createMessage(await readBody(request)));
+    return sendJson(request, response, config, 201, await runtimeAdapter.createMessage(await readBody(request)));
   }
 
   if (request.method === 'POST' && url.pathname === '/api/posts') {
-    return sendJson(request, response, config, 201, await store.createPost(await readBody(request)));
+    return sendJson(request, response, config, 201, await runtimeAdapter.createPost(await readBody(request)));
   }
 
   if (request.method === 'POST' && url.pathname === '/api/threads') {
-    return sendJson(request, response, config, 201, await store.createThread(await readBody(request)));
+    return sendJson(request, response, config, 201, await runtimeAdapter.createThread(await readBody(request)));
   }
 
   if (request.method === 'POST' && url.pathname === '/api/direct-conversations') {
-    return sendJson(request, response, config, 201, await store.createDirectConversation(await readBody(request)));
+    return sendJson(request, response, config, 201, await runtimeAdapter.createDirectConversation(await readBody(request)));
   }
 
   if (request.method === 'POST' && url.pathname === '/api/external-references') {
-    return sendJson(request, response, config, 201, await store.createExternalReference(await readBody(request)));
+    return sendJson(request, response, config, 201, await runtimeAdapter.createExternalReference(await readBody(request)));
   }
 
   if (request.method === 'POST' && url.pathname === '/api/relays') {
-    return sendJson(request, response, config, 201, await store.createRelay(await readBody(request)));
+    return sendJson(request, response, config, 201, await runtimeAdapter.createRelay(await readBody(request)));
   }
 
   if (request.method === 'POST' && url.pathname === '/api/handoffs') {
-    return sendJson(request, response, config, 201, await store.createHandoff(await readBody(request)));
+    return sendJson(request, response, config, 201, await runtimeAdapter.createHandoff(await readBody(request)));
   }
 
   if (request.method === 'POST' && url.pathname === '/api/adapters/discord/events') {
-    return sendJson(request, response, config, 201, await store.ingestDiscordEvent(await readBody(request)));
+    return sendJson(request, response, config, 201, await runtimeAdapter.ingestDiscordEvent(await readBody(request)));
   }
 
   return sendJson(request, response, config, 404, { error: 'Not found.' });
@@ -231,11 +219,17 @@ export async function createNexusService(overrides = {}) {
   const config = resolveServiceConfig(overrides);
   const store = createStore(config);
   await store.init();
+  const runtimeAdapter = createInProcessRuntimeAdapter({
+    config,
+    store,
+    contractVersion: CONTRACT_VERSION
+  });
+  await runtimeAdapter.start();
 
   const server = http.createServer(async (request, response) => {
     try {
       if (request.url?.startsWith('/api/')) {
-        await routeApi(request, response, store, config);
+        await routeApi(request, response, runtimeAdapter, config);
         return;
       }
 
@@ -254,6 +248,7 @@ export async function createNexusService(overrides = {}) {
   return {
     config,
     store,
+    runtimeAdapter,
     server,
     url: null,
     async start() {
@@ -264,7 +259,7 @@ export async function createNexusService(overrides = {}) {
     },
     async stop() {
       await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-      await store.close();
+      await runtimeAdapter.stop();
     }
   };
 }
