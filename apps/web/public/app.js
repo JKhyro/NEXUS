@@ -28,6 +28,10 @@ import {
   selectRouteHistoryIndex,
   stepRouteHistory
 } from './route-history.mjs';
+import {
+  projectPulseStatusMeta,
+  summarizeProjectPulse
+} from './project-progress.mjs';
 
 const actorSelect = document.querySelector('#actor');
 const workspaceSelect = document.querySelector('#workspace');
@@ -36,6 +40,9 @@ const recentActivityEl = document.querySelector('#recent-activity');
 const directConversationsEl = document.querySelector('#direct-conversations');
 const directComposerEl = document.querySelector('#direct-composer');
 const directMembersEl = document.querySelector('#direct-members');
+const projectPulseSummaryEl = document.querySelector('#project-pulse-summary');
+const projectPulseStatsEl = document.querySelector('#project-pulse-stats');
+const projectPulseLanesEl = document.querySelector('#project-pulse-lanes');
 const channelTitleEl = document.querySelector('#channel-title');
 const channelDescriptionEl = document.querySelector('#channel-description');
 const channelTopicEl = document.querySelector('#channel-topic');
@@ -62,6 +69,7 @@ const composerHintEl = document.querySelector('#composer-hint');
 const sendButtonEl = document.querySelector('#send-button');
 const refreshEl = document.querySelector('#refresh');
 const healthEl = document.querySelector('#health');
+const serviceHealthSummaryEl = document.querySelector('#service-health-summary');
 const searchEl = document.querySelector('#search');
 const searchResultsEl = document.querySelector('#search-results');
 const scopeSummaryEl = document.querySelector('#scope-summary');
@@ -120,6 +128,7 @@ const state = {
   identityMap: new Map(),
   channels: [],
   recentActivity: [],
+  projectPulse: null,
   directConversations: [],
   postsByChannelId: new Map(),
   postChannelIndex: new Map(),
@@ -1545,7 +1554,125 @@ function summarizeTopic(channel) {
   return 'No topic metadata is available for this lane yet.';
 }
 
+function summarizeServiceOrigin(health) {
+  if (health?.publicOrigin) {
+    return health.publicOrigin;
+  }
+  return health?.mode === 'hosted-capable'
+    ? 'Hosted origin not declared'
+    : 'Local desktop origin';
+}
+
+function summarizeServiceStorage(health) {
+  if (health?.storageMode === 'library-postgres') {
+    return 'LIBRARY Postgres';
+  }
+  if (health?.storageMode === 'json') {
+    return 'JSON bootstrap';
+  }
+  return 'Storage mode unavailable';
+}
+
+function renderProjectPulse() {
+  if (!state.projectPulse?.lanes?.length) {
+    projectPulseSummaryEl.className = 'project-pulse-summary-card summary-card empty';
+    projectPulseSummaryEl.textContent = state.projectPulse?.error
+      ? `Project pulse is unavailable: ${state.projectPulse.error}`
+      : 'Current NEXUS execution lanes will appear here after refresh.';
+    projectPulseStatsEl.innerHTML = '';
+    projectPulseLanesEl.innerHTML = '';
+    return;
+  }
+
+  const summary = summarizeProjectPulse(state.projectPulse);
+  const focusLane = summary.focusLane;
+  const focusMeta = projectPulseStatusMeta(focusLane?.status);
+  const focusLabel = focusLane
+    ? `${focusLane.kind} ${focusLane.ref} - ${focusLane.title}`
+    : summary.title;
+
+  projectPulseSummaryEl.className = 'project-pulse-summary-card summary-card';
+  projectPulseSummaryEl.innerHTML = `
+    <div class="project-pulse-summary-top">
+      <span class="pill pulse-pill pulse-pill-${focusMeta.tone}">${escapeHtml(focusMeta.label)}</span>
+      <span class="project-pulse-stamp">${escapeHtml(summary.capturedAtLabel)}</span>
+    </div>
+    <strong class="project-pulse-focus">${escapeHtml(focusLabel)}</strong>
+    <p class="project-pulse-copy">${escapeHtml(summary.summary || focusLane?.summary || 'No project pulse summary is recorded yet.')}</p>
+    <div class="project-pulse-next">
+      <span class="eyebrow">Next</span>
+      <p>${escapeHtml(summary.nextAction || 'No next action is recorded yet.')}</p>
+    </div>
+    <div class="project-pulse-source">${escapeHtml(summary.source || 'Local project pulse snapshot')}</div>
+  `;
+
+  const stats = [
+    { label: 'Done', value: summary.counts.done, tone: 'done' },
+    { label: 'Execute now', value: summary.counts.executeNow, tone: 'execute-now' },
+    { label: 'In progress', value: summary.counts.inProgress, tone: 'in-progress' },
+    { label: 'Queued', value: summary.counts.queued, tone: 'queued' },
+    { label: 'Parked', value: summary.counts.parked, tone: 'parked' }
+  ];
+
+  projectPulseStatsEl.innerHTML = stats.map((stat) => `
+    <div class="project-pulse-stat project-pulse-stat-${stat.tone}">
+      <span class="project-pulse-stat-value">${escapeHtml(stat.value)}</span>
+      <span class="project-pulse-stat-label">${escapeHtml(stat.label)}</span>
+    </div>
+  `).join('');
+
+  projectPulseLanesEl.innerHTML = state.projectPulse.lanes.map((lane) => {
+    const meta = projectPulseStatusMeta(lane.status);
+    const isFocus = lane === focusLane;
+    return `
+      <article class="project-pulse-lane${isFocus ? ' focus' : ''}">
+        <div class="project-pulse-lane-top">
+          <div class="project-pulse-lane-heading">
+            <span class="pill pulse-pill pulse-pill-${meta.tone}">${escapeHtml(meta.label)}</span>
+            <span class="project-pulse-lane-ref">${escapeHtml(`${lane.kind} ${lane.ref}`)}</span>
+          </div>
+          ${isFocus ? '<span class="project-pulse-current">Current focus</span>' : ''}
+        </div>
+        <strong>${escapeHtml(lane.title)}</strong>
+        <p class="project-pulse-lane-copy">${escapeHtml(lane.summary ?? '')}</p>
+        <div class="project-pulse-lane-next">${escapeHtml(lane.nextAction ?? '')}</div>
+      </article>
+    `;
+  }).join('');
+}
+
 function renderHealth() {
+  if (!state.health) {
+    serviceHealthSummaryEl.className = 'service-health-summary summary-card empty';
+    serviceHealthSummaryEl.textContent = 'Runtime health will appear here after refresh.';
+    healthEl.textContent = '{}';
+    return;
+  }
+
+  const readinessTone = state.health.status === 'ok' ? 'success' : 'error';
+  const readinessLabel = state.health.status === 'ok' ? 'Ready' : 'Needs attention';
+  serviceHealthSummaryEl.className = 'service-health-summary summary-card';
+  serviceHealthSummaryEl.innerHTML = `
+    <div class="service-health-top">
+      <span class="pill pulse-pill pulse-pill-${readinessTone}">${escapeHtml(readinessLabel)}</span>
+      <span class="project-pulse-stamp">${escapeHtml(state.health.contractVersion ?? 'Contract version unavailable')}</span>
+    </div>
+    <p class="service-health-copy">Current desktop baseline is running in <strong>${escapeHtml(state.health.mode ?? 'unknown mode')}</strong> with <strong>${escapeHtml(summarizeServiceStorage(state.health))}</strong> storage.</p>
+    <div class="service-health-grid">
+      <div class="service-health-metric">
+        <span class="eyebrow">Deployment</span>
+        <strong>${escapeHtml(state.health.deploymentMode ?? 'unknown')}</strong>
+      </div>
+      <div class="service-health-metric">
+        <span class="eyebrow">Static</span>
+        <strong>${escapeHtml(state.health.staticMode ?? 'unknown')}</strong>
+      </div>
+      <div class="service-health-metric service-health-metric-wide">
+        <span class="eyebrow">Origin</span>
+        <strong>${escapeHtml(summarizeServiceOrigin(state.health))}</strong>
+      </div>
+    </div>
+  `;
   healthEl.textContent = JSON.stringify(state.health ?? {}, null, 2);
 }
 
@@ -2196,6 +2323,18 @@ async function loadHealth() {
   renderHealth();
 }
 
+async function loadProjectPulse() {
+  try {
+    state.projectPulse = await getJson('/project-progress.json');
+  }
+  catch (error) {
+    state.projectPulse = {
+      error: error.message,
+      lanes: []
+    };
+  }
+}
+
 async function loadIdentities() {
   state.identities = await getJson('/api/identities');
   state.identityMap = new Map(state.identities.map((identity) => [identity.id, identity]));
@@ -2366,6 +2505,8 @@ async function loadCoordinationRecords() {
 }
 
 function renderAll() {
+  renderProjectPulse();
+  renderHealth();
   renderScopeShell();
   renderRecentActivity();
   renderChannels();
@@ -2605,6 +2746,7 @@ async function refreshAll() {
   setStatus('');
   renderDirectComposerOptions();
   await loadHealth();
+  await loadProjectPulse();
   await loadDirectConversations();
   await loadChannels();
   await syncSelection();

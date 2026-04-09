@@ -134,6 +134,16 @@
         <section class="panel slim">
           <div class="panel-header">
             <div>
+              <div class="eyebrow">Program</div>
+              <h2>Project Pulse</h2>
+            </div>
+          </div>
+          <div id="project-pulse-summary" class="project-pulse-summary-card summary-card empty">Current NEXUS execution lanes will appear here after refresh.</div>
+          <div id="project-pulse-stats" class="project-pulse-stats"></div>
+          <div id="project-pulse-lanes" class="project-pulse-lanes"></div>
+
+          <div class="panel-header">
+            <div>
               <div class="eyebrow">Route</div>
               <h2>Breadcrumbs</h2>
             </div>
@@ -310,7 +320,11 @@
               <h2>Health</h2>
             </div>
           </div>
-          <pre id="health"></pre>
+          <div id="service-health-summary" class="service-health-summary summary-card empty">Runtime health will appear here after refresh.</div>
+          <details class="health-raw">
+            <summary>Raw runtime payload</summary>
+            <pre id="health"></pre>
+          </details>
 
           <div id="status" class="status hidden"></div>
         </section>
