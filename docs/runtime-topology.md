@@ -186,3 +186,7 @@ Migration order:
 5. retire Electron only after the native runtime plus Avalonia host can cover the verified continuity responsibilities
 
 The target stack is therefore explicit, but the current mainline baseline remains the source of truth for operator continuity until those migration steps land.
+
+## Next concrete slice
+
+The next implementation-facing record is [runtime-package-manifests.md](runtime-package-manifests.md), which pins the first concrete surface-package and helper-package manifest shapes against this topology.

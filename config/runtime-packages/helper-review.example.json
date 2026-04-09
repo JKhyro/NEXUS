@@ -1,0 +1,33 @@
+{
+  "packageId": "symbiosis.helper.review",
+  "displayName": "SYMBIOSIS Review Helper",
+  "manifestVersion": "1",
+  "version": "1.0.0",
+  "sourceRuntime": "SYMBIOSIS",
+  "hostingMode": "child-process",
+  "capabilities": [
+    "message.inspect",
+    "coordination.suggest"
+  ],
+  "slotTargets": [
+    {
+      "surfacePackageId": "nexus.surface.thread",
+      "slotId": "thread-sidebar"
+    }
+  ],
+  "presentationHooks": [
+    "sidebar-card",
+    "status-pill"
+  ],
+  "handoffContracts": [
+    "coordination.record"
+  ],
+  "failurePolicy": {
+    "onCrash": "restartable",
+    "maxRestartsPerHour": 3
+  },
+  "compatibility": {
+    "minSurfaceAbi": "1",
+    "minRuntime": "nexus-runtime-core@1"
+  }
+}

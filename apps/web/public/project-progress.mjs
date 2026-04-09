@@ -28,8 +28,54 @@ export function projectPulseStatusMeta(status) {
   };
 }
 
+function normalizeProjectPulseArtifacts(artifacts) {
+  if (!Array.isArray(artifacts)) {
+    return [];
+  }
+
+  return artifacts.flatMap((artifact) => {
+    if (!artifact) {
+      return [];
+    }
+
+    if (typeof artifact === 'string') {
+      const path = artifact.trim();
+      return path
+        ? [{ label: path, path, href: '', note: '' }]
+        : [];
+    }
+
+    if (typeof artifact !== 'object') {
+      return [];
+    }
+
+    const label = typeof artifact.label === 'string' ? artifact.label.trim() : '';
+    const path = typeof artifact.path === 'string' ? artifact.path.trim() : '';
+    const href = typeof artifact.href === 'string' ? artifact.href.trim() : '';
+    const note = typeof artifact.note === 'string' ? artifact.note.trim() : '';
+
+    if (!label && !path && !href) {
+      return [];
+    }
+
+    return [{
+      label: label || path || href,
+      path,
+      href,
+      note
+    }];
+  });
+}
+
 export function summarizeProjectPulse(snapshot = {}) {
-  const lanes = Array.isArray(snapshot.lanes) ? snapshot.lanes : [];
+  const lanes = Array.isArray(snapshot.lanes)
+    ? snapshot.lanes
+      .filter((lane) => lane && typeof lane === 'object')
+      .map((lane) => ({
+        ...lane,
+        artifacts: normalizeProjectPulseArtifacts(lane.artifacts)
+      }))
+    : [];
   const counts = {
     total: lanes.length,
     done: 0,
@@ -69,6 +115,8 @@ export function summarizeProjectPulse(snapshot = {}) {
     nextAction: snapshot.nextAction ?? focusLane?.nextAction ?? '',
     capturedAtLabel: snapshot.capturedAtLabel ?? 'Review time not recorded',
     focusLane,
+    focusArtifacts: focusLane?.artifacts ?? [],
+    lanes,
     counts: {
       ...counts,
       active: counts.executeNow + counts.inProgress

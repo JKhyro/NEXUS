@@ -1,0 +1,38 @@
+{
+  "packageId": "nexus.surface.thread",
+  "displayName": "NEXUS Thread Surface",
+  "manifestVersion": "1",
+  "abiVersion": "1",
+  "surfaceKind": "thread",
+  "entrypoint": {
+    "runtime": "native-c",
+    "symbol": "nexus_surface_thread_bootstrap"
+  },
+  "hostCapabilities": [
+    "conversation.read",
+    "message.compose",
+    "coordination.focus",
+    "route.selection"
+  ],
+  "routing": {
+    "scopeType": "thread",
+    "requiresMessageStream": true
+  },
+  "helperSlots": [
+    {
+      "slotId": "thread-sidebar",
+      "allowedKinds": [
+        "inspector",
+        "review-helper"
+      ]
+    }
+  ],
+  "failurePolicy": {
+    "onCrash": "degrade-surface",
+    "onIncompatibleHelper": "reject-helper"
+  },
+  "compatibility": {
+    "minHost": "nexus-host-avalonia@1",
+    "minRuntime": "nexus-runtime-core@1"
+  }
+}

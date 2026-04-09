@@ -1573,6 +1573,38 @@ function summarizeServiceStorage(health) {
   return 'Storage mode unavailable';
 }
 
+function renderProjectPulseArtifact(artifact) {
+  const label = escapeHtml(artifact?.label ?? artifact?.path ?? artifact?.href ?? 'Artifact');
+  const path = artifact?.path ? `<code class="project-pulse-artifact-path">${escapeHtml(artifact.path)}</code>` : '';
+  const note = artifact?.note ? `<div class="project-pulse-artifact-note">${escapeHtml(artifact.note)}</div>` : '';
+  const heading = artifact?.href
+    ? `<a class="project-pulse-artifact-link" href="${escapeHtml(artifact.href)}" target="_blank" rel="noreferrer">${label}</a>`
+    : `<span class="project-pulse-artifact-label">${label}</span>`;
+
+  return `
+    <div class="project-pulse-artifact">
+      ${heading}
+      ${path}
+      ${note}
+    </div>
+  `;
+}
+
+function renderProjectPulseArtifacts(artifacts) {
+  if (!artifacts?.length) {
+    return '';
+  }
+
+  return `
+    <div class="project-pulse-artifacts">
+      <span class="eyebrow">Artifacts</span>
+      <div class="project-pulse-artifact-list">
+        ${artifacts.map((artifact) => renderProjectPulseArtifact(artifact)).join('')}
+      </div>
+    </div>
+  `;
+}
+
 function renderProjectPulse() {
   if (!state.projectPulse?.lanes?.length) {
     projectPulseSummaryEl.className = 'project-pulse-summary-card summary-card empty';
@@ -1585,6 +1617,7 @@ function renderProjectPulse() {
   }
 
   const summary = summarizeProjectPulse(state.projectPulse);
+  const lanes = summary.lanes;
   const focusLane = summary.focusLane;
   const focusMeta = projectPulseStatusMeta(focusLane?.status);
   const focusLabel = focusLane
@@ -1603,6 +1636,7 @@ function renderProjectPulse() {
       <span class="eyebrow">Next</span>
       <p>${escapeHtml(summary.nextAction || 'No next action is recorded yet.')}</p>
     </div>
+    ${renderProjectPulseArtifacts(summary.focusArtifacts)}
     <div class="project-pulse-source">${escapeHtml(summary.source || 'Local project pulse snapshot')}</div>
   `;
 
@@ -1621,7 +1655,7 @@ function renderProjectPulse() {
     </div>
   `).join('');
 
-  projectPulseLanesEl.innerHTML = state.projectPulse.lanes.map((lane) => {
+  projectPulseLanesEl.innerHTML = lanes.map((lane) => {
     const meta = projectPulseStatusMeta(lane.status);
     const isFocus = lane === focusLane;
     return `
@@ -1636,6 +1670,7 @@ function renderProjectPulse() {
         <strong>${escapeHtml(lane.title)}</strong>
         <p class="project-pulse-lane-copy">${escapeHtml(lane.summary ?? '')}</p>
         <div class="project-pulse-lane-next">${escapeHtml(lane.nextAction ?? '')}</div>
+        ${renderProjectPulseArtifacts(lane.artifacts)}
       </article>
     `;
   }).join('');
