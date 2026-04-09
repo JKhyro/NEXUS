@@ -127,4 +127,4 @@ Helper-slot failure must degrade the slot, not the whole route.
 
 ## Immediate follow-on
 
-The next implementation-facing step is to bind this route envelope and slot model back into the first supervisor seam in [runtime-migration-seam.md](runtime-migration-seam.md) so the future runtime can activate surface programs without inheriting Electron-specific lifecycle ownership.
+The next implementation-facing step is to bind this route envelope and slot model back into the first supervisor seam in [runtime-first-migration-seam.md](runtime-first-migration-seam.md) so the future runtime can activate surface programs without inheriting Electron-specific lifecycle ownership.

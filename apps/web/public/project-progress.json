@@ -2,9 +2,9 @@
   "title": "Project Pulse",
   "capturedAt": "2026-04-09T14:50:00+09:00",
   "capturedAtLabel": "Reviewed Apr 9, 2026, 14:50 JST",
-  "summary": "The continuity baseline, README clarification, topology split, and manifest contracts are now merged on main, while the active NEXUS work has shifted to the first migration seam under issue #57 and the newly activated conversation-surface program model in issue #56.",
-  "source": "GitHub-first NEXUS truth sweep after PR #60 merge and the active migration-seam plus conversation-surface branch review.",
-  "nextAction": "Move the first Electron-owned runtime responsibility behind a native supervisor seam without breaking the verified HTTP/UI contract, then carry the conversation-surface child-program model into future route and helper-slot activation work.",
+  "summary": "PR #60 is merged, the NEXUS project board is back in sync, and the active work has now expanded from issue #57's first migration seam into the newly activated issue #56 conversation-surface program model.",
+  "source": "GitHub-first NEXUS truth sweep after PR #60 merge, project-board resync, and the active migration-seam plus conversation-surface branch review.",
+  "nextAction": "Move the first Electron-owned runtime responsibility behind a native supervisor seam without breaking the verified HTTP/UI contract, then carry the conversation-surface child-program model into route activation and helper-slot work.",
   "lanes": [
     {
       "kind": "PR",
@@ -101,16 +101,16 @@
       "nextAction": "Define the first native supervisor seam around service lifecycle, health, logging, and startup failure handling while preserving the current web/API surface as the migration baseline.",
       "artifacts": [
         {
-          "label": "Runtime topology record",
-          "path": "docs/runtime-topology.md"
+          "label": "First migration seam record",
+          "path": "docs/runtime-first-migration-seam.md"
         },
         {
           "label": "Manifest contract record",
           "path": "docs/runtime-package-manifests.md"
         },
         {
-          "label": "First migration seam",
-          "path": "docs/runtime-migration-seam.md"
+          "label": "Runtime topology record",
+          "path": "docs/runtime-topology.md"
         },
         {
           "label": "Current service supervisor baseline",

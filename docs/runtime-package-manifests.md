@@ -131,7 +131,7 @@ The future native runtime should:
 
 The next records that build directly on these manifest contracts are:
 
-- [runtime-migration-seam.md](runtime-migration-seam.md)
+- [runtime-first-migration-seam.md](runtime-first-migration-seam.md)
 - [conversation-surface-program-model.md](conversation-surface-program-model.md)
 
 ## Initial manifest files
