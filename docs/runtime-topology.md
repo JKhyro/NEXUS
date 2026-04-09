@@ -190,3 +190,7 @@ The target stack is therefore explicit, but the current mainline baseline remain
 ## Next concrete slice
 
 The next implementation-facing record is [runtime-package-manifests.md](runtime-package-manifests.md), which pins the first concrete surface-package and helper-package manifest shapes against this topology.
+
+## Current follow-on slice
+
+The current follow-on record is [runtime-first-migration-seam.md](runtime-first-migration-seam.md), which chooses the first migration seam from the verified Electron and Node baseline into the future native runtime plus Avalonia direction.

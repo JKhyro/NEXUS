@@ -164,3 +164,4 @@ Live `POST /api/adapters/discord/events` ingress now persists a relay record for
 - [Hosted service mode](docs/hosted-service-mode.md)
 - [Runtime topology](docs/runtime-topology.md)
 - [Runtime package manifests](docs/runtime-package-manifests.md)
+- [First runtime migration seam](docs/runtime-first-migration-seam.md)

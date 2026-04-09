@@ -1,10 +1,10 @@
 {
   "title": "Project Pulse",
-  "capturedAt": "2026-04-09T13:30:35+09:00",
-  "capturedAtLabel": "Reviewed Apr 9, 2026, 13:30 JST",
-  "summary": "The continuity baseline, README clarification, and first runtime-topology slice are merged on main, while the active issue #57 lane now records concrete manifest contracts and shows linked implementation artifacts in Project Pulse.",
-  "source": "GitHub-first NEXUS truth sweep after PR #55 and PR #59 merge, plus the active issue #57 manifest-contract branch review.",
-  "nextAction": "Define the first concrete surface-package and helper-package manifest shapes, then use those package contracts to choose the first migration seam away from the current Electron shell.",
+  "capturedAt": "2026-04-09T13:41:28+09:00",
+  "capturedAtLabel": "Reviewed Apr 9, 2026, 13:41 JST",
+  "summary": "PR #60 is now merged, the NEXUS project board is synced again, and the active issue #57 lane has advanced from manifest contracts to choosing the first migration seam away from the current Electron and Node continuity baseline.",
+  "source": "GitHub-first NEXUS truth sweep after PR #60 merge, issue #57 writeback, and successful NEXUS project-board resync.",
+  "nextAction": "Define the first migration seam that moves runtime supervision and package activation behind the current service/API boundary while keeping the shipped Electron shell and web client as the continuity host.",
   "lanes": [
     {
       "kind": "PR",
@@ -71,12 +71,12 @@
       ]
     },
     {
-      "kind": "Issue",
-      "ref": "#57",
-      "status": "execute-now",
-      "title": "Packaging and runtime topology",
-      "summary": "Native-C-first topology remains the active engineering lane, and the next concrete slice is the manifest/package contract for surface packages and imported helper packages.",
-      "nextAction": "Define the first surface-package and helper-package manifest shapes, plus the first migration seam from the Electron shell to the future runtime.",
+      "kind": "PR",
+      "ref": "#60",
+      "status": "done",
+      "title": "Runtime package manifest contracts",
+      "summary": "The first runtime package-manifest record, example package files, and Project Pulse artifact surfacing are now merged on main.",
+      "nextAction": "Use the merged manifest contracts to choose the first runtime migration seam before opening the downstream conversation-surface program-model lane.",
       "artifacts": [
         {
           "label": "Manifest contract record",
@@ -94,11 +94,33 @@
     },
     {
       "kind": "Issue",
+      "ref": "#57",
+      "status": "execute-now",
+      "title": "Packaging and runtime topology",
+      "summary": "Native-C-first topology remains the active engineering lane, and the next concrete slice is the first migration seam that moves runtime supervision and package activation out from behind the temporary Node baseline.",
+      "nextAction": "Keep the shipped Electron shell and current web client as the continuity host while defining the runtime-core seam that should land first.",
+      "artifacts": [
+        {
+          "label": "First migration seam record",
+          "path": "docs/runtime-first-migration-seam.md"
+        },
+        {
+          "label": "Manifest contract record",
+          "path": "docs/runtime-package-manifests.md"
+        },
+        {
+          "label": "Runtime topology record",
+          "path": "docs/runtime-topology.md"
+        }
+      ]
+    },
+    {
+      "kind": "Issue",
       "ref": "#56",
       "status": "queued",
       "title": "Conversation-surface program model",
-      "summary": "The child-program and embedded-helper surface model is queued behind the continuity-validation and runtime-topology work already in flight.",
-      "nextAction": "Unblock this lane after the first manifest/package shapes are recorded for issue #57."
+      "summary": "The child-program and embedded-helper surface model is now unblocked by the merged manifest contracts, but it stays queued until the first runtime migration seam is selected.",
+      "nextAction": "Move this lane to active work after issue #57 defines the first runtime seam against the merged manifest and topology baseline."
     },
     {
       "kind": "Issue",
