@@ -1,4 +1,7 @@
+import { createId } from './ids.mjs';
+
 const DEFAULT_EVENT_LIMIT = 10;
+const ALLOWED_LIFECYCLE_STATES = new Set(['active', 'background', 'suspended', 'draining']);
 
 function timestamp(now) {
   const value = now();
@@ -15,6 +18,35 @@ function normalizeFailure(error, at) {
     code: typeof error?.code === 'string' ? error.code : 'runtime-supervisor-start-failed',
     message: error?.message ?? 'Runtime supervisor failed to start.'
   };
+}
+
+function normalizeCommandFailure(error, at, commandType) {
+  return {
+    at,
+    commandType,
+    code: typeof error?.code === 'string' ? error.code : 'runtime-command-dispatch-failed',
+    message: error?.message ?? 'Runtime command dispatch failed.'
+  };
+}
+
+function createCommandValidationError(message, details = null) {
+  const error = new Error(message);
+  error.code = 'runtime-command-invalid';
+  error.statusCode = 400;
+  error.details = details;
+  return error;
+}
+
+function createCommandCapabilityDeniedError(activationId, commandType, requiredCapability) {
+  const error = new Error(`Runtime activation ${activationId} is not approved to dispatch ${commandType} with capability ${requiredCapability}.`);
+  error.code = 'runtime-command-capability-denied';
+  error.statusCode = 403;
+  error.details = {
+    activationId,
+    commandType,
+    requiredCapability
+  };
+  return error;
 }
 
 function summarizeHelperSlot(slot) {
@@ -36,17 +68,77 @@ function summarizeDiagnostic(diagnostic) {
   };
 }
 
+function ensureCommandEnvelope(commandEnvelope) {
+  if (!commandEnvelope || typeof commandEnvelope !== 'object' || Array.isArray(commandEnvelope)) {
+    throw createCommandValidationError('Runtime command dispatch requires a JSON object payload.');
+  }
+
+  if (typeof commandEnvelope.commandType !== 'string' || commandEnvelope.commandType.trim().length === 0) {
+    throw createCommandValidationError('Runtime command field commandType must be a non-empty string.', {
+      field: 'commandType'
+    });
+  }
+
+  if (commandEnvelope.payload !== undefined && (!commandEnvelope.payload || typeof commandEnvelope.payload !== 'object' || Array.isArray(commandEnvelope.payload))) {
+    throw createCommandValidationError('Runtime command field payload must be omitted or be a JSON object.', {
+      field: 'payload'
+    });
+  }
+
+  if (commandEnvelope.requiredCapability !== undefined && (typeof commandEnvelope.requiredCapability !== 'string' || commandEnvelope.requiredCapability.trim().length === 0)) {
+    throw createCommandValidationError('Runtime command field requiredCapability must be omitted or be a non-empty string.', {
+      field: 'requiredCapability'
+    });
+  }
+
+  if (commandEnvelope.targetLifecycleState !== undefined) {
+    if (typeof commandEnvelope.targetLifecycleState !== 'string' || commandEnvelope.targetLifecycleState.trim().length === 0) {
+      throw createCommandValidationError('Runtime command field targetLifecycleState must be omitted or be a non-empty string.', {
+        field: 'targetLifecycleState'
+      });
+    }
+
+    const normalizedTargetLifecycleState = commandEnvelope.targetLifecycleState.trim();
+    if (!ALLOWED_LIFECYCLE_STATES.has(normalizedTargetLifecycleState)) {
+      throw createCommandValidationError(
+        `Runtime command targetLifecycleState ${normalizedTargetLifecycleState} is not supported.`,
+        {
+          field: 'targetLifecycleState',
+          allowedValues: [...ALLOWED_LIFECYCLE_STATES]
+        }
+      );
+    }
+  }
+
+  return {
+    commandType: commandEnvelope.commandType.trim(),
+    payload: commandEnvelope.payload ?? {},
+    requiredCapability: typeof commandEnvelope.requiredCapability === 'string'
+      ? commandEnvelope.requiredCapability.trim()
+      : null,
+    targetLifecycleState: typeof commandEnvelope.targetLifecycleState === 'string'
+      ? commandEnvelope.targetLifecycleState.trim()
+      : 'active'
+  };
+}
+
 function createActivationRecord(activation) {
   return {
     activationId: activation.activationId,
     activatedAt: activation.activatedAt,
+    lifecycleState: 'active',
+    commandDispatchCount: 0,
+    lastCommandAt: null,
+    lastCommand: null,
+    lastCommandFailure: null,
     route: {
       actorId: activation.route.actorId,
       workspaceId: activation.route.workspaceId,
       surfaceKind: activation.route.surfaceKind,
       scopeId: activation.route.scopeId,
       selectedMessageId: activation.route.selectedMessageId,
-      surfacePackageId: activation.route.surfacePackageId
+      surfacePackageId: activation.route.surfacePackageId,
+      grantedCapabilities: [...(activation.route.grantedCapabilities ?? [])]
     },
     surface: {
       packageId: activation.surface.packageId,
@@ -62,6 +154,21 @@ function createActivationRecord(activation) {
     diagnostics: Array.isArray(activation.diagnostics)
       ? activation.diagnostics.map(summarizeDiagnostic)
       : []
+  };
+}
+
+function createCommandRecord(commandEnvelope, activationRecord, commandResult, dispatchedAt, completedAt, dispatchOwner, targetOwner) {
+  return {
+    commandId: createId('runtime-command'),
+    activationId: activationRecord.activationId,
+    commandType: commandEnvelope.commandType,
+    requiredCapability: commandEnvelope.requiredCapability,
+    targetLifecycleState: commandEnvelope.targetLifecycleState,
+    dispatchedAt,
+    completedAt,
+    dispatchOwner,
+    targetOwner,
+    result: commandResult
   };
 }
 
@@ -93,6 +200,9 @@ export function createRuntimeSupervisor({
     stoppedAt: null,
     lastActivatedAt: null,
     lastReleasedAt: null,
+    lastCommandAt: null,
+    commandDispatchCount: 0,
+    lastCommand: null,
     manifestRegistry: null,
     activeRouteActivations: [],
     lastFailure: null,
@@ -124,12 +234,27 @@ export function createRuntimeSupervisor({
       stoppedAt: state.stoppedAt,
       lastActivatedAt: state.lastActivatedAt,
       lastReleasedAt: state.lastReleasedAt,
+      lastCommandAt: state.lastCommandAt,
+      commandDispatchCount: state.commandDispatchCount,
+      lastCommand: state.lastCommand ? {
+        ...state.lastCommand,
+        result: state.lastCommand.result && typeof state.lastCommand.result === 'object'
+          ? { ...state.lastCommand.result }
+          : state.lastCommand.result
+      } : null,
       manifestRegistry: state.manifestRegistry,
       activeRouteActivationCount: state.activeRouteActivations.length,
       activeRouteActivations: state.activeRouteActivations.map((activation) => ({
         ...activation,
         route: { ...activation.route },
         surface: { ...activation.surface },
+        lastCommand: activation.lastCommand ? {
+          ...activation.lastCommand,
+          result: activation.lastCommand.result && typeof activation.lastCommand.result === 'object'
+            ? { ...activation.lastCommand.result }
+            : activation.lastCommand.result
+        } : null,
+        lastCommandFailure: activation.lastCommandFailure ? { ...activation.lastCommandFailure } : null,
         helperSlots: activation.helperSlots.map((slot) => ({ ...slot })),
         diagnostics: activation.diagnostics.map((diagnostic) => ({ ...diagnostic }))
       })),
@@ -208,6 +333,84 @@ export function createRuntimeSupervisor({
         degradedHelperSlotCount: record.helperSlots.filter((slot) => slot.status === 'degraded').length
       });
       return activation;
+    },
+    async dispatchRouteCommand(activationId, commandEnvelope, executeCommand) {
+      const recordIndex = state.activeRouteActivations.findIndex((entry) => entry.activationId === activationId);
+      if (recordIndex === -1) {
+        throw createActivationNotFoundError(activationId);
+      }
+
+      const activation = state.activeRouteActivations[recordIndex];
+      const normalizedCommand = ensureCommandEnvelope(commandEnvelope);
+      if (
+        normalizedCommand.requiredCapability
+        && !activation.route.grantedCapabilities.includes(normalizedCommand.requiredCapability)
+      ) {
+        throw createCommandCapabilityDeniedError(
+          activationId,
+          normalizedCommand.commandType,
+          normalizedCommand.requiredCapability
+        );
+      }
+
+      const dispatchedAt = timestamp(now);
+      activation.lifecycleState = 'dispatching';
+      recordEvent('command-dispatch-started', {
+        activationId,
+        commandType: normalizedCommand.commandType,
+        targetLifecycleState: normalizedCommand.targetLifecycleState
+      });
+
+      try {
+        const commandResult = await executeCommand({
+          activation: {
+            ...activation,
+            route: { ...activation.route },
+            surface: { ...activation.surface }
+          },
+          command: normalizedCommand
+        });
+        const completedAt = timestamp(now);
+        activation.lifecycleState = normalizedCommand.targetLifecycleState;
+        activation.commandDispatchCount += 1;
+        activation.lastCommandAt = completedAt;
+        activation.lastCommandFailure = null;
+        const commandRecord = createCommandRecord(
+          normalizedCommand,
+          activation,
+          commandResult,
+          dispatchedAt,
+          completedAt,
+          state.owner,
+          state.targetOwner
+        );
+        activation.lastCommand = commandRecord;
+        state.commandDispatchCount += 1;
+        state.lastCommandAt = completedAt;
+        state.lastCommand = commandRecord;
+        recordEvent('command-dispatched', {
+          activationId,
+          commandId: commandRecord.commandId,
+          commandType: normalizedCommand.commandType,
+          resultingLifecycleState: activation.lifecycleState
+        });
+        return commandRecord;
+      }
+      catch (error) {
+        const failedAt = timestamp(now);
+        activation.lifecycleState = 'command-failed';
+        activation.lastCommandFailure = normalizeCommandFailure(
+          error,
+          failedAt,
+          normalizedCommand.commandType
+        );
+        recordEvent('command-dispatch-failed', {
+          activationId,
+          commandType: normalizedCommand.commandType,
+          code: activation.lastCommandFailure.code
+        });
+        throw error;
+      }
     },
     listRouteActivations() {
       return getStatus().activeRouteActivations;

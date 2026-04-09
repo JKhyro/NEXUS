@@ -1595,6 +1595,19 @@ function summarizeLastRuntimeActivation(health) {
   return `Last activated ${formatTimestamp(lastActivatedAt)}`;
 }
 
+function summarizeRuntimeCommandCount(health) {
+  return String(health?.runtime?.commandDispatchCount ?? 0);
+}
+
+function summarizeLastRuntimeCommand(health) {
+  const lastCommand = health?.runtime?.lastCommand ?? null;
+  if (!lastCommand?.commandType) {
+    return 'No runtime command dispatched yet';
+  }
+
+  return `${lastCommand.commandType} at ${formatTimestamp(lastCommand.completedAt ?? lastCommand.dispatchedAt)}`;
+}
+
 function currentRouteActivationRequest() {
   const directConversation = currentDirectConversation();
   if (directConversation) {
@@ -1898,6 +1911,14 @@ function renderHealth() {
       <div class="service-health-metric service-health-metric-wide">
         <span class="eyebrow">Last activation</span>
         <strong>${escapeHtml(summarizeLastRuntimeActivation(state.health))}</strong>
+      </div>
+      <div class="service-health-metric">
+        <span class="eyebrow">Commands</span>
+        <strong>${escapeHtml(summarizeRuntimeCommandCount(state.health))}</strong>
+      </div>
+      <div class="service-health-metric service-health-metric-wide">
+        <span class="eyebrow">Last command</span>
+        <strong>${escapeHtml(summarizeLastRuntimeCommand(state.health))}</strong>
       </div>
       <div class="service-health-metric service-health-metric-wide">
         <span class="eyebrow">Supervisor event</span>

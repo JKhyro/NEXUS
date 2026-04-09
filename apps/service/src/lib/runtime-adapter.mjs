@@ -25,6 +25,9 @@ function createRuntimeHealthSnapshot(config, runtimeState, store, supervisorStat
       startedAt: supervisorStatus.startedAt,
       lastActivatedAt: supervisorStatus.lastActivatedAt,
       lastReleasedAt: supervisorStatus.lastReleasedAt,
+      lastCommandAt: supervisorStatus.lastCommandAt,
+      commandDispatchCount: supervisorStatus.commandDispatchCount,
+      lastCommand: supervisorStatus.lastCommand,
       activeRouteActivationCount: supervisorStatus.activeRouteActivationCount,
       activeRouteActivations: supervisorStatus.activeRouteActivations,
       manifestRegistry: supervisorStatus.manifestRegistry,
@@ -39,6 +42,16 @@ function createRuntimeSupervisorNotReadyError(supervisorStatus) {
   error.statusCode = 503;
   error.details = {
     supervisor: supervisorStatus
+  };
+  return error;
+}
+
+function createRuntimeCommandActivationIdError() {
+  const error = new Error('Runtime command dispatch requires a non-empty activationId.');
+  error.code = 'runtime-command-invalid';
+  error.statusCode = 400;
+  error.details = {
+    field: 'activationId'
   };
   return error;
 }
@@ -78,6 +91,23 @@ export function createInProcessRuntimeAdapter({
     },
     listRouteActivations() {
       return runtimeSupervisor.listRouteActivations();
+    },
+    async dispatchRouteCommand(activationId, commandEnvelope) {
+      if (!runtimeSupervisor.isReady()) {
+        throw createRuntimeSupervisorNotReadyError(runtimeSupervisor.getStatus());
+      }
+      if (typeof activationId !== 'string' || activationId.trim().length === 0) {
+        throw createRuntimeCommandActivationIdError();
+      }
+      return runtimeSupervisor.dispatchRouteCommand(activationId, commandEnvelope, async ({ activation, command }) => ({
+        accepted: true,
+        handlingMode: 'transition-adapter',
+        backingImplementation: runtimeState.backingImplementation,
+        transitionSeam: runtimeState.transitionSeam,
+        surfacePackageId: activation.surface.packageId,
+        surfaceKind: activation.surface.surfaceKind,
+        echoedPayload: command.payload
+      }));
     },
     releaseRouteActivation(activationId) {
       return runtimeSupervisor.releaseRouteActivation(activationId);
