@@ -1,10 +1,10 @@
 {
   "title": "Project Pulse",
-  "capturedAt": "2026-04-09T13:10:55+09:00",
-  "capturedAtLabel": "Reviewed Apr 9, 2026, 13:10 JST",
-  "summary": "The continuity baseline is now merged on main, and the active NEXUS engineering lane has shifted to the first native-runtime topology pass in issue #57.",
-  "source": "GitHub-first NEXUS truth sweep after PR #58 merge and issue #54 closure.",
-  "nextAction": "Define the first concrete host/runtime split for the native runtime, Avalonia host, interop boundary, and child-surface packaging while keeping the Electron baseline explicit as the migration source.",
+  "capturedAt": "2026-04-09T13:30:35+09:00",
+  "capturedAtLabel": "Reviewed Apr 9, 2026, 13:30 JST",
+  "summary": "The continuity baseline, README clarification, and first runtime-topology slice are merged on main, while the active issue #57 lane now records concrete manifest contracts and shows linked implementation artifacts in Project Pulse.",
+  "source": "GitHub-first NEXUS truth sweep after PR #55 and PR #59 merge, plus the active issue #57 manifest-contract branch review.",
+  "nextAction": "Define the first concrete surface-package and helper-package manifest shapes, then use those package contracts to choose the first migration seam away from the current Electron shell.",
   "lanes": [
     {
       "kind": "PR",
@@ -12,7 +12,21 @@
       "status": "done",
       "title": "Project Pulse operator surface",
       "summary": "The right-rail Project Pulse and readable runtime-health surface shipped to main and now anchor operator-visible progress and readiness in the client.",
-      "nextAction": "Keep the snapshot truthful as active NEXUS lanes move."
+      "nextAction": "Keep the snapshot truthful as active NEXUS lanes move.",
+      "artifacts": [
+        {
+          "label": "Project Pulse renderer",
+          "path": "apps/web/public/app.js"
+        },
+        {
+          "label": "Project Pulse layout",
+          "path": "apps/web/public/index.html"
+        },
+        {
+          "label": "Project Pulse styles",
+          "path": "apps/web/public/styles.css"
+        }
+      ]
     },
     {
       "kind": "Issue",
@@ -20,23 +34,63 @@
       "status": "done",
       "title": "Desktop readiness validation",
       "summary": "Continuity validation closed cleanly after the current Electron and Node baseline passed 72 out of 72 automated checks and the operator-readability slice landed.",
-      "nextAction": "Use the verified baseline as the migration source for the next runtime-topology work."
+      "nextAction": "Use the verified baseline as the migration source for the next runtime-topology work.",
+      "artifacts": [
+        {
+          "label": "Project Pulse test coverage",
+          "path": "test/project-progress.test.mjs"
+        }
+      ]
+    },
+    {
+      "kind": "PR",
+      "ref": "#55",
+      "status": "done",
+      "title": "README direction clarification",
+      "summary": "The README now explicitly distinguishes the current Electron continuity baseline from the approved native-C plus Avalonia target direction.",
+      "nextAction": "Keep future topology work out of the README lane unless operator-facing baseline wording changes again.",
+      "artifacts": [
+        {
+          "label": "Desktop direction baseline",
+          "path": "README.md"
+        }
+      ]
+    },
+    {
+      "kind": "PR",
+      "ref": "#59",
+      "status": "done",
+      "title": "First runtime-topology slice",
+      "summary": "The first concrete runtime-topology record shipped to main with the native runtime core, Avalonia host, package boundaries, and interop contract made explicit.",
+      "nextAction": "Turn the topology record into manifest shapes and migration-boundary decisions.",
+      "artifacts": [
+        {
+          "label": "Runtime topology record",
+          "path": "docs/runtime-topology.md"
+        }
+      ]
     },
     {
       "kind": "Issue",
       "ref": "#57",
       "status": "execute-now",
       "title": "Packaging and runtime topology",
-      "summary": "Native-C-first topology is now the active engineering lane, with Avalonia host responsibilities, native runtime ownership, and interop boundaries needing explicit first-pass definition.",
-      "nextAction": "Define the first concrete host/runtime split and the package boundaries for channel, forum, thread, timeline, and direct surfaces."
-    },
-    {
-      "kind": "PR",
-      "ref": "#55",
-      "status": "in-progress",
-      "title": "README direction clarification",
-      "summary": "The README clarification lane remains open so the current Electron baseline and the target native-C plus Avalonia direction stay explicitly separated.",
-      "nextAction": "Land the clarification without mixing issue-57 topology work back into the README-only lane."
+      "summary": "Native-C-first topology remains the active engineering lane, and the next concrete slice is the manifest/package contract for surface packages and imported helper packages.",
+      "nextAction": "Define the first surface-package and helper-package manifest shapes, plus the first migration seam from the Electron shell to the future runtime.",
+      "artifacts": [
+        {
+          "label": "Manifest contract record",
+          "path": "docs/runtime-package-manifests.md"
+        },
+        {
+          "label": "Thread surface example",
+          "path": "config/runtime-packages/surface-thread.example.json"
+        },
+        {
+          "label": "Review helper example",
+          "path": "config/runtime-packages/helper-review.example.json"
+        }
+      ]
     },
     {
       "kind": "Issue",
@@ -44,7 +98,7 @@
       "status": "queued",
       "title": "Conversation-surface program model",
       "summary": "The child-program and embedded-helper surface model is queued behind the continuity-validation and runtime-topology work already in flight.",
-      "nextAction": "Unblock this lane after the first runtime-topology split is recorded."
+      "nextAction": "Unblock this lane after the first manifest/package shapes are recorded for issue #57."
     },
     {
       "kind": "Issue",

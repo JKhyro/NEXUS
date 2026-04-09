@@ -12,7 +12,16 @@ test('summarizeProjectPulse counts lane states and selects the execute-now focus
     lanes: [
       { ref: '#58', status: 'done', nextAction: 'Keep the shipped surface truthful.' },
       { ref: '#57', status: 'in-progress', nextAction: 'Continue topology work.' },
-      { ref: '#54', status: 'execute-now', nextAction: 'Write back readiness findings.' },
+      {
+        ref: '#54',
+        status: 'execute-now',
+        nextAction: 'Write back readiness findings.',
+        artifacts: [
+          { label: 'Runtime topology', path: 'docs/runtime-topology.md' },
+          'config/runtime-packages/surface-thread.example.json',
+          null
+        ]
+      },
       { ref: '#56', status: 'queued', nextAction: 'Wait for runtime topology.' },
       { ref: '#47', status: 'parked', nextAction: 'Keep parked.' }
     ]
@@ -29,6 +38,20 @@ test('summarizeProjectPulse counts lane states and selects the execute-now focus
     active: 2
   });
   assert.equal(summary.nextAction, 'Write back readiness findings.');
+  assert.deepEqual(summary.focusArtifacts, [
+    {
+      label: 'Runtime topology',
+      path: 'docs/runtime-topology.md',
+      href: '',
+      note: ''
+    },
+    {
+      label: 'config/runtime-packages/surface-thread.example.json',
+      path: 'config/runtime-packages/surface-thread.example.json',
+      href: '',
+      note: ''
+    }
+  ]);
 });
 
 test('summarizeProjectPulse falls back to the first in-progress lane when no execute-now lane exists', () => {
