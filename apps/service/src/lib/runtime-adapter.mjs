@@ -1,8 +1,9 @@
 import { createRuntimeManifestRegistry } from './runtime-manifest-registry.mjs';
+import { createRuntimeSupervisor } from './runtime-supervisor.mjs';
 
-function createRuntimeHealthSnapshot(config, runtimeState, store) {
+function createRuntimeHealthSnapshot(config, runtimeState, store, supervisorStatus) {
   return {
-    status: 'ok',
+    status: supervisorStatus.readiness === 'ready' ? 'ok' : 'degraded',
     contractVersion: runtimeState.contractVersion,
     mode: config.deploymentMode === 'hosted' ? 'hosted-capable' : 'desktop-local-first',
     deploymentMode: config.deploymentMode,
@@ -19,41 +20,56 @@ function createRuntimeHealthSnapshot(config, runtimeState, store) {
       targetOwner: runtimeState.targetOwner,
       transitionSeam: runtimeState.transitionSeam,
       backingImplementation: runtimeState.backingImplementation,
-      lifecycleState: runtimeState.lifecycleState,
-      startedAt: runtimeState.startedAt,
-      manifestRegistry: runtimeState.manifestRegistry
+      readiness: supervisorStatus.readiness,
+      lifecycleState: supervisorStatus.lifecycleState,
+      startedAt: supervisorStatus.startedAt,
+      manifestRegistry: supervisorStatus.manifestRegistry,
+      supervisor: supervisorStatus
     }
   };
 }
 
-export function createInProcessRuntimeAdapter({ config, store, contractVersion }) {
-  const manifestRegistry = createRuntimeManifestRegistry({ repoRoot: config.repoRoot });
+function createRuntimeSupervisorNotReadyError(supervisorStatus) {
+  const error = new Error('Runtime supervisor is not ready to activate routes.');
+  error.code = 'runtime-supervisor-not-ready';
+  error.statusCode = 503;
+  error.details = {
+    supervisor: supervisorStatus
+  };
+  return error;
+}
+
+export function createInProcessRuntimeAdapter({
+  config,
+  store,
+  contractVersion,
+  manifestRegistry = createRuntimeManifestRegistry({ repoRoot: config.repoRoot }),
+  runtimeSupervisor = createRuntimeSupervisor({ manifestRegistry })
+}) {
   const runtimeState = {
     owner: 'node-transition-adapter',
     targetOwner: 'native-runtime-core',
     transitionSeam: 'service-runtime-boundary',
     backingImplementation: 'in-process-store',
-    lifecycleState: 'created',
-    startedAt: null,
-    manifestRegistry: null,
     contractVersion
   };
 
   return {
     store,
     async start() {
-      runtimeState.manifestRegistry = await manifestRegistry.getSummary();
-      runtimeState.lifecycleState = 'running';
-      runtimeState.startedAt = new Date().toISOString();
+      await runtimeSupervisor.start();
     },
     async stop() {
-      runtimeState.lifecycleState = 'stopped';
+      await runtimeSupervisor.stop();
       await store.close();
     },
     getHealthSnapshot() {
-      return createRuntimeHealthSnapshot(config, runtimeState, store);
+      return createRuntimeHealthSnapshot(config, runtimeState, store, runtimeSupervisor.getStatus());
     },
     async activateRoute(routeEnvelope) {
+      if (!runtimeSupervisor.isReady()) {
+        throw createRuntimeSupervisorNotReadyError(runtimeSupervisor.getStatus());
+      }
       return manifestRegistry.activateRoute(routeEnvelope);
     },
     getBootstrapSummary() {
