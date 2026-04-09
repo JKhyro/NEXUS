@@ -212,6 +212,20 @@ async function routeApi(request, response, runtimeAdapter, config) {
     return sendJson(request, response, config, 200, await runtimeAdapter.activateRoute(await readBody(request)));
   }
 
+  if (request.method === 'GET' && url.pathname === '/api/runtime/route-activations') {
+    return sendJson(request, response, config, 200, runtimeAdapter.listRouteActivations());
+  }
+
+  if (request.method === 'DELETE' && url.pathname === '/api/runtime/route-activations') {
+    return sendJson(
+      request,
+      response,
+      config,
+      200,
+      runtimeAdapter.releaseRouteActivation(url.searchParams.get('activationId'))
+    );
+  }
+
   if (request.method === 'POST' && url.pathname === '/api/adapters/discord/events') {
     return sendJson(request, response, config, 201, await runtimeAdapter.ingestDiscordEvent(await readBody(request)));
   }

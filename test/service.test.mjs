@@ -44,12 +44,15 @@ test('service boots and exposes the seeded internal channel map', async () => {
     assert.equal(health.runtime.readiness, 'ready');
     assert.equal(health.runtime.backingImplementation, 'in-process-store');
     assert.equal(health.runtime.lifecycleState, 'running');
+    assert.equal(health.runtime.activeRouteActivationCount, 0);
+    assert.deepEqual(health.runtime.activeRouteActivations, []);
     assert.equal(health.runtime.manifestRegistry.surfacePackageCount, 4);
     assert.equal(health.runtime.manifestRegistry.helperPackageCount, 1);
     assert.equal(health.runtime.supervisor.transitionSeam, 'service-runtime-supervisor-boundary');
     assert.equal(health.runtime.supervisor.readiness, 'ready');
     assert.equal(health.runtime.supervisor.lifecycleState, 'running');
     assert.equal(health.runtime.supervisor.startupAttemptCount, 1);
+    assert.equal(health.runtime.supervisor.activeRouteActivationCount, 0);
     assert(health.runtime.supervisor.recentEvents.some((event) => event.type === 'start-attempt'));
     assert(health.runtime.supervisor.recentEvents.some((event) => event.type === 'start-succeeded'));
 
@@ -288,6 +291,79 @@ test('route activation resolves a manifest-backed direct surface and compatible 
     assert.equal(activation.helperSlots.length, 1);
     assert.equal(activation.helperSlots[0].status, 'bound');
     assert.deepEqual(activation.diagnostics, []);
+  });
+});
+
+test('route activation is retained as supervisor-owned runtime state and can be released', async () => {
+  await withService(async (service) => {
+    const activationResponse = await fetch(`${service.url}/api/runtime/route-activations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        workspaceId: 'workspace-internal-core',
+        surfaceKind: 'thread',
+        scopeId: 'thread-roadmap-71',
+        surfacePackageId: 'nexus.surface.thread',
+        routeCapabilities: [
+          'conversation.read',
+          'message.compose'
+        ],
+        helperSlotRequests: [
+          {
+            slotId: 'thread-sidebar',
+            preferredHelperPackageId: 'symbiosis.helper.review'
+          }
+        ]
+      })
+    });
+    const activation = await activationResponse.json();
+
+    assert.equal(activationResponse.status, 200);
+
+    const activeActivationsResponse = await fetch(`${service.url}/api/runtime/route-activations`);
+    const activeActivations = await activeActivationsResponse.json();
+    assert.equal(activeActivationsResponse.status, 200);
+    assert.equal(activeActivations.length, 1);
+    assert.equal(activeActivations[0].activationId, activation.activationId);
+    assert.equal(activeActivations[0].route.surfaceKind, 'thread');
+    assert.equal(activeActivations[0].surface.packageId, 'nexus.surface.thread');
+    assert.equal(activeActivations[0].helperSlots[0].helperPackageId, 'symbiosis.helper.review');
+
+    const healthWhileActive = await fetch(`${service.url}/api/health`).then((response) => response.json());
+    assert.equal(healthWhileActive.runtime.activeRouteActivationCount, 1);
+    assert.equal(healthWhileActive.runtime.activeRouteActivations[0].activationId, activation.activationId);
+    assert.equal(healthWhileActive.runtime.supervisor.activeRouteActivationCount, 1);
+    assert(healthWhileActive.runtime.supervisor.recentEvents.some((event) => event.type === 'route-activated'));
+
+    const releasedResponse = await fetch(
+      `${service.url}/api/runtime/route-activations?activationId=${encodeURIComponent(activation.activationId)}`,
+      { method: 'DELETE' }
+    );
+    const released = await releasedResponse.json();
+    assert.equal(releasedResponse.status, 200);
+    assert.equal(released.activationId, activation.activationId);
+    assert.match(released.releasedAt, /\d{4}-\d{2}-\d{2}T/);
+
+    const healthAfterRelease = await fetch(`${service.url}/api/health`).then((response) => response.json());
+    assert.equal(healthAfterRelease.runtime.activeRouteActivationCount, 0);
+    assert.deepEqual(healthAfterRelease.runtime.activeRouteActivations, []);
+    assert.equal(healthAfterRelease.runtime.supervisor.activeRouteActivationCount, 0);
+    assert(healthAfterRelease.runtime.supervisor.recentEvents.some((event) => event.type === 'route-released'));
+  });
+});
+
+test('releasing an unknown runtime activation returns a stable not-found error', async () => {
+  await withService(async (service) => {
+    const releaseResponse = await fetch(
+      `${service.url}/api/runtime/route-activations?activationId=${encodeURIComponent('route-activation-missing')}`,
+      { method: 'DELETE' }
+    );
+    const body = await releaseResponse.json();
+
+    assert.equal(releaseResponse.status, 404);
+    assert.equal(body.code, 'runtime-activation-not-found');
+    assert.equal(body.details.activationId, 'route-activation-missing');
   });
 });
 

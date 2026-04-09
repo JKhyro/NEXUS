@@ -1,10 +1,10 @@
 {
   "title": "Project Pulse",
-  "capturedAt": "2026-04-09T15:11:00+09:00",
-  "capturedAtLabel": "Reviewed Apr 9, 2026, 15:11 JST",
-  "summary": "Issue #56 is shipped and closed through PR #68, manifest-backed activation now covers thread, channel, forum, and direct surfaces in the client, issue #57 is back to the execute-now lane, and the project board is still GraphQL-blocked.",
-  "source": "GitHub-first NEXUS truth sweep after the PR #68 merge, plus verified main-branch coverage for widened route activation and client-visible activation state.",
-  "nextAction": "Keep issue #57 moving on the deeper runtime-ownership seam, preserve the new operator-visible activation diagnostics, and retry project-board sync when GitHub GraphQL recovers.",
+  "capturedAt": "2026-04-09T15:46:00+09:00",
+  "capturedAtLabel": "Reviewed Apr 9, 2026, 15:46 JST",
+  "summary": "Issue #57 has moved forward again: the runtime supervisor now owns active route-activation state, additive list and release APIs are implemented behind the existing HTTP contract, the health surface shows active runtime route ownership directly, and the NEXUS project board is no longer GraphQL-blocked.",
+  "source": "GitHub-first NEXUS truth sweep after the issue #56 closure and project-board recovery, plus verified branch coverage for supervisor-owned route activation state and operator-visible runtime health updates.",
+  "nextAction": "Publish the active #57 runtime-ownership delta, keep the new health-surface visibility truthful in the client, and continue the deeper native-runtime ownership seam behind the supervisor boundary.",
   "lanes": [
     {
       "kind": "PR",
@@ -183,8 +183,8 @@
       "ref": "#57",
       "status": "execute-now",
       "title": "Packaging and runtime topology",
-      "summary": "With #56 shipped, the runtime-topology lane is active again. The degraded runtime supervisor seam and widened surface activation are live on main, but deeper runtime ownership and project-board reconciliation still remain before this lane is complete.",
-      "nextAction": "Move the next deeper runtime-ownership slice behind the supervisor seam, then retry project-board sync when GitHub GraphQL recovers.",
+      "summary": "With #56 shipped, the runtime-topology lane is active again. The degraded runtime supervisor seam now retains active route-activation state, exposes additive list and release APIs, and surfaces active runtime-route ownership in health without breaking the current HTTP contract.",
+      "nextAction": "Publish the active runtime-ownership delta, then continue moving lifecycle and activation ownership behind the supervisor seam.",
       "artifacts": [
         {
           "label": "First migration seam record",
@@ -201,6 +201,22 @@
         {
           "label": "Runtime supervisor seam",
           "path": "apps/service/src/lib/runtime-supervisor.mjs"
+        },
+        {
+          "label": "Runtime adapter ownership seam",
+          "path": "apps/service/src/lib/runtime-adapter.mjs"
+        },
+        {
+          "label": "Runtime activation service surface",
+          "path": "apps/service/src/server.mjs"
+        },
+        {
+          "label": "Operator-visible runtime health",
+          "path": "apps/web/public/app.js"
+        },
+        {
+          "label": "Runtime ownership verification",
+          "path": "test/service.test.mjs"
         }
       ]
     },
