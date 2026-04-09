@@ -1573,6 +1573,43 @@ function summarizeServiceStorage(health) {
   return 'Storage mode unavailable';
 }
 
+function summarizeSupervisorTone(supervisor) {
+  if (supervisor?.readiness === 'ready') {
+    return 'success';
+  }
+  if (supervisor?.readiness === 'degraded') {
+    return 'error';
+  }
+  return 'watching';
+}
+
+function summarizeSupervisorLabel(supervisor) {
+  if (!supervisor?.readiness) {
+    return 'Supervisor unknown';
+  }
+  return `Supervisor ${supervisor.readiness}`;
+}
+
+function summarizeSupervisorEvent(supervisor) {
+  const recentEvent = Array.isArray(supervisor?.recentEvents)
+    ? supervisor.recentEvents[supervisor.recentEvents.length - 1]
+    : null;
+
+  if (!recentEvent?.type) {
+    return 'No supervisor events recorded yet';
+  }
+
+  return `${recentEvent.type.replaceAll('-', ' ')} at ${formatTimestamp(recentEvent.at)}`;
+}
+
+function summarizeSupervisorFailure(supervisor) {
+  if (!supervisor?.lastFailure) {
+    return 'No startup failure recorded';
+  }
+
+  return `${supervisor.lastFailure.code}: ${supervisor.lastFailure.message}`;
+}
+
 function renderProjectPulseArtifact(artifact) {
   const label = escapeHtml(artifact?.label ?? artifact?.path ?? artifact?.href ?? 'Artifact');
   const path = artifact?.path ? `<code class="project-pulse-artifact-path">${escapeHtml(artifact.path)}</code>` : '';
@@ -1686,13 +1723,17 @@ function renderHealth() {
 
   const readinessTone = state.health.status === 'ok' ? 'success' : 'error';
   const readinessLabel = state.health.status === 'ok' ? 'Ready' : 'Needs attention';
+  const runtime = state.health.runtime ?? {};
+  const supervisor = runtime.supervisor ?? null;
+  const supervisorTone = summarizeSupervisorTone(supervisor);
   serviceHealthSummaryEl.className = 'service-health-summary summary-card';
   serviceHealthSummaryEl.innerHTML = `
     <div class="service-health-top">
       <span class="pill pulse-pill pulse-pill-${readinessTone}">${escapeHtml(readinessLabel)}</span>
+      <span class="pill pulse-pill pulse-pill-${supervisorTone}">${escapeHtml(summarizeSupervisorLabel(supervisor))}</span>
       <span class="project-pulse-stamp">${escapeHtml(state.health.contractVersion ?? 'Contract version unavailable')}</span>
     </div>
-    <p class="service-health-copy">Current desktop baseline is running in <strong>${escapeHtml(state.health.mode ?? 'unknown mode')}</strong> with <strong>${escapeHtml(summarizeServiceStorage(state.health))}</strong> storage.</p>
+    <p class="service-health-copy">Current desktop baseline is running in <strong>${escapeHtml(state.health.mode ?? 'unknown mode')}</strong> with <strong>${escapeHtml(summarizeServiceStorage(state.health))}</strong> storage, and the runtime seam is currently <strong>${escapeHtml(runtime.readiness ?? 'unknown')}</strong>.</p>
     <div class="service-health-grid">
       <div class="service-health-metric">
         <span class="eyebrow">Deployment</span>
@@ -1705,6 +1746,22 @@ function renderHealth() {
       <div class="service-health-metric service-health-metric-wide">
         <span class="eyebrow">Origin</span>
         <strong>${escapeHtml(summarizeServiceOrigin(state.health))}</strong>
+      </div>
+      <div class="service-health-metric">
+        <span class="eyebrow">Runtime</span>
+        <strong>${escapeHtml(runtime.lifecycleState ?? 'unknown')}</strong>
+      </div>
+      <div class="service-health-metric">
+        <span class="eyebrow">Startup attempts</span>
+        <strong>${escapeHtml(String(supervisor?.startupAttemptCount ?? 0))}</strong>
+      </div>
+      <div class="service-health-metric service-health-metric-wide">
+        <span class="eyebrow">Supervisor event</span>
+        <strong>${escapeHtml(summarizeSupervisorEvent(supervisor))}</strong>
+      </div>
+      <div class="service-health-metric service-health-metric-wide">
+        <span class="eyebrow">Failure state</span>
+        <strong>${escapeHtml(summarizeSupervisorFailure(supervisor))}</strong>
       </div>
     </div>
   `;

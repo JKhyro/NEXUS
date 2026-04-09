@@ -1,10 +1,10 @@
 {
   "title": "Project Pulse",
-  "capturedAt": "2026-04-09T14:19:38+09:00",
-  "capturedAtLabel": "Reviewed Apr 9, 2026, 14:19 JST",
-  "summary": "PR #64 is merged, NEXUS now has manifest-backed conversation-surface route activation, and the next execute-now lane returns to issue #57's native supervisor seam while issue #56 expands beyond the first thread-surface binding.",
-  "source": "GitHub-first NEXUS truth sweep after PR #64 merge and issue #56 writeback; project-board sync remains blocked by GitHub GraphQL rate limiting.",
-  "nextAction": "Move service lifecycle, health, logging, and startup failure handling behind the next native supervisor seam, then extend route activation and helper-slot state beyond the first thread surface into additional conversation surfaces and UI affordances.",
+  "capturedAt": "2026-04-09T14:40:00+09:00",
+  "capturedAtLabel": "Reviewed Apr 9, 2026, 14:40 JST",
+  "summary": "PR #66 is merged, NEXUS now exposes a degraded runtime supervisor seam through `/api/health`, and the next execute-now lane moves back to issue #56 while issue #57 stays active and the project board remains GraphQL-blocked.",
+  "source": "GitHub-first NEXUS truth sweep after PR #66 merge and issue #57 writeback; project-board sync remains blocked by GitHub GraphQL rate limiting.",
+  "nextAction": "Extend route activation and helper-slot execution beyond the first thread surface, keep the newly merged supervisor state readable in the client, and retry project-board sync when GitHub GraphQL recovers.",
   "lanes": [
     {
       "kind": "PR",
@@ -119,12 +119,38 @@
       ]
     },
     {
+      "kind": "PR",
+      "ref": "#66",
+      "status": "done",
+      "title": "Degraded runtime supervisor seam",
+      "summary": "The service now keeps running when supervisor startup fails, exposes structured readiness and failure state through `/api/health`, and returns clean `503` responses for runtime-only activation when the supervisor is not ready.",
+      "nextAction": "Use the merged supervisor seam to widen operator-visible runtime state and continue the next conversation-surface expansion lane.",
+      "artifacts": [
+        {
+          "label": "Runtime supervisor seam",
+          "path": "apps/service/src/lib/runtime-supervisor.mjs"
+        },
+        {
+          "label": "Runtime adapter readiness gate",
+          "path": "apps/service/src/lib/runtime-adapter.mjs"
+        },
+        {
+          "label": "Service startup seam",
+          "path": "apps/service/src/server.mjs"
+        },
+        {
+          "label": "Supervisor failure coverage",
+          "path": "test/service.test.mjs"
+        }
+      ]
+    },
+    {
       "kind": "Issue",
       "ref": "#57",
-      "status": "execute-now",
+      "status": "in-progress",
       "title": "Packaging and runtime topology",
-      "summary": "Native-C-first topology remains the active engineering lane, and the first backend runtime seam is now live in code, so the next concrete slice is native-style supervision for service lifecycle, health, logging, and startup failure handling without breaking continuity.",
-      "nextAction": "Move the current service supervisor responsibilities behind the next native runtime seam while preserving the verified web/API contract and additive health reporting.",
+      "summary": "Native-C-first topology remains active, and the degraded runtime supervisor seam is now live in code. Deeper runtime ownership and project-board reconciliation still remain before this lane is complete.",
+      "nextAction": "Retry project-board sync when GitHub GraphQL recovers, then keep moving activation and lifecycle ownership behind the runtime seam without breaking continuity.",
       "artifacts": [
         {
           "label": "First migration seam record",
@@ -139,18 +165,18 @@
           "path": "docs/runtime-topology.md"
         },
         {
-          "label": "Current service supervisor baseline",
-          "path": "apps/desktop/src/service-runtime.mjs"
+          "label": "Runtime supervisor seam",
+          "path": "apps/service/src/lib/runtime-supervisor.mjs"
         }
       ]
     },
     {
       "kind": "Issue",
       "ref": "#56",
-      "status": "in-progress",
+      "status": "execute-now",
       "title": "Conversation-surface program model",
-      "summary": "The first child-program model is now executable for the thread surface through manifest-backed route activation, helper-slot binding, and degraded helper failure handling that preserves imported-helper ownership visibility.",
-      "nextAction": "Extend route activation and helper-slot execution from the first thread surface into the remaining conversation surfaces and expose activation state more directly in the client.",
+      "summary": "The first child-program model is executable for the thread surface, and the next immediate expansion is wider conversation-surface coverage plus more legible activation and failure state in the operator-facing client.",
+      "nextAction": "Extend route activation and helper-slot execution beyond the first thread surface and surface the resulting activation state more directly in the client.",
       "artifacts": [
         {
           "label": "Conversation-surface program model",
@@ -163,6 +189,10 @@
         {
           "label": "Route activation service coverage",
           "path": "test/service.test.mjs"
+        },
+        {
+          "label": "Runtime supervisor seam",
+          "path": "apps/service/src/lib/runtime-supervisor.mjs"
         }
       ]
     },
