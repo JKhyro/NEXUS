@@ -1,10 +1,10 @@
 {
   "title": "Project Pulse",
-  "capturedAt": "2026-04-09T13:30:35+09:00",
-  "capturedAtLabel": "Reviewed Apr 9, 2026, 13:30 JST",
-  "summary": "The continuity baseline, README clarification, and first runtime-topology slice are merged on main, while the active issue #57 lane now records concrete manifest contracts and shows linked implementation artifacts in Project Pulse.",
-  "source": "GitHub-first NEXUS truth sweep after PR #55 and PR #59 merge, plus the active issue #57 manifest-contract branch review.",
-  "nextAction": "Define the first concrete surface-package and helper-package manifest shapes, then use those package contracts to choose the first migration seam away from the current Electron shell.",
+  "capturedAt": "2026-04-09T14:50:00+09:00",
+  "capturedAtLabel": "Reviewed Apr 9, 2026, 14:50 JST",
+  "summary": "The continuity baseline, README clarification, topology split, and manifest contracts are now merged on main, while the active NEXUS work has shifted to the first migration seam under issue #57 and the newly activated conversation-surface program model in issue #56.",
+  "source": "GitHub-first NEXUS truth sweep after PR #60 merge and the active migration-seam plus conversation-surface branch review.",
+  "nextAction": "Move the first Electron-owned runtime responsibility behind a native supervisor seam without breaking the verified HTTP/UI contract, then carry the conversation-surface child-program model into future route and helper-slot activation work.",
   "lanes": [
     {
       "kind": "PR",
@@ -71,15 +71,15 @@
       ]
     },
     {
-      "kind": "Issue",
-      "ref": "#57",
-      "status": "execute-now",
-      "title": "Packaging and runtime topology",
-      "summary": "Native-C-first topology remains the active engineering lane, and the next concrete slice is the manifest/package contract for surface packages and imported helper packages.",
-      "nextAction": "Define the first surface-package and helper-package manifest shapes, plus the first migration seam from the Electron shell to the future runtime.",
+      "kind": "PR",
+      "ref": "#60",
+      "status": "done",
+      "title": "Runtime package manifest contracts",
+      "summary": "The first explicit surface-package and helper-package manifest contracts are merged on main, and Project Pulse can now expose architecture artifacts directly in the UI.",
+      "nextAction": "Use the merged contracts to pick the first migration seam and activate the conversation-surface program model.",
       "artifacts": [
         {
-          "label": "Manifest contract record",
+          "label": "Runtime package manifest record",
           "path": "docs/runtime-package-manifests.md"
         },
         {
@@ -94,11 +94,43 @@
     },
     {
       "kind": "Issue",
+      "ref": "#57",
+      "status": "execute-now",
+      "title": "Packaging and runtime topology",
+      "summary": "Native-C-first topology remains the active engineering lane, and the next concrete slice is the first replacement seam that moves Electron-owned runtime supervision toward the future native core without breaking continuity.",
+      "nextAction": "Define the first native supervisor seam around service lifecycle, health, logging, and startup failure handling while preserving the current web/API surface as the migration baseline.",
+      "artifacts": [
+        {
+          "label": "Runtime topology record",
+          "path": "docs/runtime-topology.md"
+        },
+        {
+          "label": "Manifest contract record",
+          "path": "docs/runtime-package-manifests.md"
+        },
+        {
+          "label": "First migration seam",
+          "path": "docs/runtime-migration-seam.md"
+        },
+        {
+          "label": "Current service supervisor baseline",
+          "path": "apps/desktop/src/service-runtime.mjs"
+        }
+      ]
+    },
+    {
+      "kind": "Issue",
       "ref": "#56",
-      "status": "queued",
+      "status": "in-progress",
       "title": "Conversation-surface program model",
-      "summary": "The child-program and embedded-helper surface model is queued behind the continuity-validation and runtime-topology work already in flight.",
-      "nextAction": "Unblock this lane after the first manifest/package shapes are recorded for issue #57."
+      "summary": "The first child-program model is now active against the merged manifest contracts so channel, forum, thread, timeline, and direct surfaces can declare helper slots and ownership-visible hosting rules explicitly.",
+      "nextAction": "Define the first route-activation envelope and per-surface slot model without hiding imported-helper ownership or failure state.",
+      "artifacts": [
+        {
+          "label": "Conversation-surface program model",
+          "path": "docs/conversation-surface-program-model.md"
+        }
+      ]
     },
     {
       "kind": "Issue",
