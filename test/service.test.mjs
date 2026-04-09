@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 import { createNexusService } from '../apps/service/src/server.mjs';
 import { resolveServiceConfig } from '../apps/service/src/lib/config.mjs';
+import { createInProcessRuntimeAdapter } from '../apps/service/src/lib/runtime-adapter.mjs';
 import { createStore } from '../apps/service/src/lib/store-factory.mjs';
 
 async function withService(run) {
@@ -20,6 +21,19 @@ async function withService(run) {
   }
 }
 
+function createFailingManifestRegistry(code = 'TEST_RUNTIME_SUPERVISOR_BOOT_FAILED') {
+  return {
+    async getSummary() {
+      const error = new Error('Synthetic runtime supervisor bootstrap failure.');
+      error.code = code;
+      throw error;
+    },
+    async activateRoute() {
+      throw new Error('activateRoute should not execute when the runtime supervisor is degraded.');
+    }
+  };
+}
+
 test('service boots and exposes the seeded internal channel map', async () => {
   await withService(async (service) => {
     const health = await fetch(`${service.url}/api/health`).then((response) => response.json());
@@ -27,10 +41,17 @@ test('service boots and exposes the seeded internal channel map', async () => {
     assert.equal(health.runtime.owner, 'node-transition-adapter');
     assert.equal(health.runtime.targetOwner, 'native-runtime-core');
     assert.equal(health.runtime.transitionSeam, 'service-runtime-boundary');
+    assert.equal(health.runtime.readiness, 'ready');
     assert.equal(health.runtime.backingImplementation, 'in-process-store');
     assert.equal(health.runtime.lifecycleState, 'running');
     assert.equal(health.runtime.manifestRegistry.surfacePackageCount, 1);
     assert.equal(health.runtime.manifestRegistry.helperPackageCount, 1);
+    assert.equal(health.runtime.supervisor.transitionSeam, 'service-runtime-supervisor-boundary');
+    assert.equal(health.runtime.supervisor.readiness, 'ready');
+    assert.equal(health.runtime.supervisor.lifecycleState, 'running');
+    assert.equal(health.runtime.supervisor.startupAttemptCount, 1);
+    assert(health.runtime.supervisor.recentEvents.some((event) => event.type === 'start-attempt'));
+    assert(health.runtime.supervisor.recentEvents.some((event) => event.type === 'start-succeeded'));
 
     const workspaces = await fetch(`${service.url}/api/workspaces?actorId=identity-jack`).then((response) => response.json());
     assert.equal(workspaces.length, 1);
@@ -44,6 +65,65 @@ test('service boots and exposes the seeded internal channel map', async () => {
     assert(slugs.has('hera'));
     assert(slugs.has('librarian'));
   });
+});
+
+test('service boots in degraded mode when the runtime supervisor startup fails', async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'nexus-supervisor-'));
+  const bootstrapFailureCode = 'TEST_RUNTIME_SUPERVISOR_BOOT_FAILED';
+  const service = await createNexusService({
+    dataDir,
+    port: 0,
+    storageMode: 'json',
+    runtimeAdapterFactory: ({ config, store, contractVersion }) => createInProcessRuntimeAdapter({
+      config,
+      store,
+      contractVersion,
+      manifestRegistry: createFailingManifestRegistry(bootstrapFailureCode)
+    })
+  });
+
+  await service.start();
+  try {
+    const healthResponse = await fetch(`${service.url}/api/health`);
+    const health = await healthResponse.json();
+    assert.equal(healthResponse.status, 200);
+    assert.equal(health.status, 'degraded');
+    assert.equal(health.runtime.readiness, 'degraded');
+    assert.equal(health.runtime.lifecycleState, 'start-failed');
+    assert.equal(health.runtime.supervisor.transitionSeam, 'service-runtime-supervisor-boundary');
+    assert.equal(health.runtime.supervisor.lifecycleState, 'start-failed');
+    assert.equal(health.runtime.supervisor.lastFailure.code, bootstrapFailureCode);
+    assert(health.runtime.supervisor.recentEvents.some((event) => event.type === 'start-failed'));
+
+    const workspacesResponse = await fetch(`${service.url}/api/workspaces?actorId=identity-jack`);
+    const workspaces = await workspacesResponse.json();
+    assert.equal(workspacesResponse.status, 200);
+    assert.equal(workspaces.length, 1);
+
+    const activationResponse = await fetch(`${service.url}/api/runtime/route-activations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        workspaceId: 'workspace-internal-core',
+        surfaceKind: 'thread',
+        scopeId: 'thread-roadmap-71',
+        surfacePackageId: 'nexus.surface.thread',
+        routeCapabilities: [
+          'conversation.read'
+        ],
+        helperSlotRequests: []
+      })
+    });
+    const activation = await activationResponse.json();
+    assert.equal(activationResponse.status, 503);
+    assert.equal(activation.code, 'runtime-supervisor-not-ready');
+    assert.equal(activation.details.supervisor.lifecycleState, 'start-failed');
+    assert.equal(activation.details.supervisor.lastFailure.code, bootstrapFailureCode);
+  }
+  finally {
+    await service.stop();
+  }
 });
 
 test('route activation resolves a manifest-backed thread surface and compatible helper slot', async () => {

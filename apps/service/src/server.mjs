@@ -222,8 +222,9 @@ async function routeApi(request, response, runtimeAdapter, config) {
 export async function createNexusService(overrides = {}) {
   const config = resolveServiceConfig(overrides);
   const store = createStore(config);
+  const runtimeAdapterFactory = overrides.runtimeAdapterFactory ?? createInProcessRuntimeAdapter;
   await store.init();
-  const runtimeAdapter = createInProcessRuntimeAdapter({
+  const runtimeAdapter = runtimeAdapterFactory({
     config,
     store,
     contractVersion: CONTRACT_VERSION
