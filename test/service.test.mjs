@@ -45,8 +45,11 @@ test('service boots and exposes the seeded internal channel map', async () => {
     assert.equal(health.runtime.backingImplementation, 'in-process-store');
     assert.equal(health.runtime.lifecycleState, 'running');
     assert.equal(health.runtime.lastCommandAt, null);
+    assert.equal(health.runtime.lastCrashAt, null);
     assert.equal(health.runtime.commandDispatchCount, 0);
+    assert.equal(health.runtime.crashCount, 0);
     assert.equal(health.runtime.lastCommand, null);
+    assert.equal(health.runtime.lastCrash, null);
     assert.equal(health.runtime.activeRouteActivationCount, 0);
     assert.deepEqual(health.runtime.activeRouteActivations, []);
     assert.equal(health.runtime.manifestRegistry.surfacePackageCount, 4);
@@ -422,6 +425,127 @@ test('runtime command dispatch is retained as supervisor-owned lifecycle state',
   });
 });
 
+test('runtime helper crash is isolated and restartable helper slots recover behind the supervisor seam', async () => {
+  await withService(async (service) => {
+    const activation = await fetch(`${service.url}/api/runtime/route-activations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        workspaceId: 'workspace-internal-core',
+        surfaceKind: 'thread',
+        scopeId: 'thread-roadmap-71',
+        surfacePackageId: 'nexus.surface.thread',
+        routeCapabilities: [
+          'conversation.read',
+          'message.compose'
+        ],
+        helperSlotRequests: [
+          {
+            slotId: 'thread-sidebar',
+            preferredHelperPackageId: 'symbiosis.helper.review'
+          }
+        ]
+      })
+    }).then((response) => response.json());
+
+    const crashResponse = await fetch(`${service.url}/api/runtime/route-activations/helper-crashes`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        activationId: activation.activationId,
+        slotId: 'thread-sidebar',
+        code: 'TEST_HELPER_CRASH',
+        message: 'Synthetic helper crash for restart coverage.'
+      })
+    });
+    const crash = await crashResponse.json();
+
+    assert.equal(crashResponse.status, 200);
+    assert.equal(crash.activationId, activation.activationId);
+    assert.equal(crash.slotId, 'thread-sidebar');
+    assert.equal(crash.helperPackageId, 'symbiosis.helper.review');
+    assert.equal(crash.recoveryAction, 'restarted');
+    assert.equal(crash.failure.code, 'TEST_HELPER_CRASH');
+    assert.equal(crash.helperSlot.status, 'bound');
+    assert.equal(crash.helperSlot.restartCount, 1);
+
+    const eventsResponse = await fetch(`${service.url}/api/runtime/events`);
+    const events = await eventsResponse.json();
+    assert.equal(eventsResponse.status, 200);
+    assert(events.some((event) => event.type === 'helper-crash-reported'));
+    assert(events.some((event) => event.type === 'helper-restart-scheduled'));
+    assert(events.some((event) => event.type === 'helper-restarted'));
+
+    const activeActivations = await fetch(`${service.url}/api/runtime/route-activations`).then((response) => response.json());
+    assert.equal(activeActivations.length, 1);
+    assert.equal(activeActivations[0].helperSlots[0].status, 'bound');
+    assert.equal(activeActivations[0].helperSlots[0].restartCount, 1);
+    assert.equal(activeActivations[0].helperSlots[0].lastFailure.code, 'TEST_HELPER_CRASH');
+
+    const health = await fetch(`${service.url}/api/health`).then((response) => response.json());
+    assert.equal(health.runtime.crashCount, 1);
+    assert.equal(health.runtime.lastCrash.slotId, 'thread-sidebar');
+    assert.equal(health.runtime.lastCrash.recoveryAction, 'restarted');
+    assert.equal(health.runtime.activeRouteActivations[0].helperSlots[0].restartCount, 1);
+    assert(health.runtime.supervisor.recentEvents.some((event) => event.type === 'helper-crash-reported'));
+    assert(health.runtime.supervisor.recentEvents.some((event) => event.type === 'helper-restarted'));
+  });
+});
+
+test('runtime helper crash degrades a slot once the restart budget is exhausted', async () => {
+  await withService(async (service) => {
+    const activation = await fetch(`${service.url}/api/runtime/route-activations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        workspaceId: 'workspace-internal-core',
+        surfaceKind: 'thread',
+        scopeId: 'thread-roadmap-71',
+        surfacePackageId: 'nexus.surface.thread',
+        routeCapabilities: [
+          'conversation.read'
+        ],
+        helperSlotRequests: [
+          {
+            slotId: 'thread-sidebar',
+            preferredHelperPackageId: 'symbiosis.helper.review'
+          }
+        ]
+      })
+    }).then((response) => response.json());
+
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      const crashResponse = await fetch(`${service.url}/api/runtime/route-activations/helper-crashes`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          activationId: activation.activationId,
+          slotId: 'thread-sidebar',
+          code: `TEST_HELPER_CRASH_${attempt}`,
+          message: `Synthetic helper crash ${attempt}.`
+        })
+      });
+      const crash = await crashResponse.json();
+      assert.equal(crashResponse.status, 200);
+      assert.equal(crash.activationId, activation.activationId);
+    }
+
+    const activeActivations = await fetch(`${service.url}/api/runtime/route-activations`).then((response) => response.json());
+    assert.equal(activeActivations.length, 1);
+    assert.equal(activeActivations[0].helperSlots[0].status, 'degraded');
+    assert.equal(activeActivations[0].helperSlots[0].restartCount, 3);
+    assert(activeActivations[0].diagnostics.some((diagnostic) => diagnostic.code === 'helper-crash-isolated'));
+
+    const health = await fetch(`${service.url}/api/health`).then((response) => response.json());
+    assert.equal(health.runtime.crashCount, 4);
+    assert.equal(health.runtime.lastCrash.recoveryAction, 'degraded');
+    assert.equal(health.runtime.activeRouteActivations[0].helperSlots[0].status, 'degraded');
+    assert(health.runtime.supervisor.recentEvents.some((event) => event.type === 'helper-crash-isolated'));
+  });
+});
+
 test('releasing an unknown runtime activation returns a stable not-found error', async () => {
   await withService(async (service) => {
     const releaseResponse = await fetch(
@@ -494,6 +618,65 @@ test('runtime command dispatch rejects unsupported capability use and invalid pa
     const missing = await missingResponse.json();
     assert.equal(missingResponse.status, 404);
     assert.equal(missing.code, 'runtime-activation-not-found');
+  });
+});
+
+test('runtime helper crash reporting rejects invalid activation and slot requests', async () => {
+  await withService(async (service) => {
+    const missingActivationResponse = await fetch(`${service.url}/api/runtime/route-activations/helper-crashes`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        activationId: 'route-activation-missing',
+        slotId: 'thread-sidebar',
+        code: 'TEST_HELPER_CRASH'
+      })
+    });
+    const missingActivation = await missingActivationResponse.json();
+    assert.equal(missingActivationResponse.status, 404);
+    assert.equal(missingActivation.code, 'runtime-activation-not-found');
+
+    const activation = await fetch(`${service.url}/api/runtime/route-activations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        workspaceId: 'workspace-internal-core',
+        surfaceKind: 'thread',
+        scopeId: 'thread-roadmap-71',
+        surfacePackageId: 'nexus.surface.thread',
+        routeCapabilities: [
+          'conversation.read'
+        ],
+        helperSlotRequests: []
+      })
+    }).then((response) => response.json());
+
+    const invalidPayloadResponse = await fetch(`${service.url}/api/runtime/route-activations/helper-crashes`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        activationId: activation.activationId,
+        slotId: ''
+      })
+    });
+    const invalidPayload = await invalidPayloadResponse.json();
+    assert.equal(invalidPayloadResponse.status, 400);
+    assert.equal(invalidPayload.code, 'runtime-command-invalid');
+    assert.equal(invalidPayload.details.field, 'slotId');
+
+    const missingSlotResponse = await fetch(`${service.url}/api/runtime/route-activations/helper-crashes`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        activationId: activation.activationId,
+        slotId: 'thread-sidebar',
+        code: 'TEST_HELPER_CRASH'
+      })
+    });
+    const missingSlot = await missingSlotResponse.json();
+    assert.equal(missingSlotResponse.status, 404);
+    assert.equal(missingSlot.code, 'runtime-helper-slot-not-found');
   });
 });
 
