@@ -1,0 +1,38 @@
+{
+  "packageId": "nexus.surface.timeline",
+  "displayName": "NEXUS Timeline Surface",
+  "manifestVersion": "1",
+  "abiVersion": "1",
+  "surfaceKind": "timeline",
+  "entrypoint": {
+    "runtime": "native-c",
+    "symbol": "nexus_surface_timeline_bootstrap"
+  },
+  "hostCapabilities": [
+    "conversation.read",
+    "coordination.focus",
+    "route.selection"
+  ],
+  "routing": {
+    "scopeType": "timeline",
+    "requiresMessageStream": true,
+    "allowsCrossScopeResults": true
+  },
+  "helperSlots": [
+    {
+      "slotId": "timeline-filter",
+      "allowedKinds": [
+        "inspector",
+        "review-helper"
+      ]
+    }
+  ],
+  "failurePolicy": {
+    "onCrash": "degrade-surface",
+    "onIncompatibleHelper": "reject-helper"
+  },
+  "compatibility": {
+    "minHost": "nexus-host-avalonia@1",
+    "minRuntime": "nexus-runtime-core@1"
+  }
+}

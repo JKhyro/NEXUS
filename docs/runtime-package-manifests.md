@@ -5,6 +5,7 @@
 This record turns the `#57` topology split into concrete package-manifest shapes that future runtime work can implement without reopening the topology decision.
 
 These manifests are packaging contracts, not a claim that the native runtime is already landed.
+They feed the [runtime container interface](runtime-container-interface.md), which activates route-local surface programs and helper slots through the Native C runtime boundary.
 
 ## Interface contract
 
@@ -57,12 +58,14 @@ The runtime should reject a surface manifest when:
 - `abiVersion` is incompatible
 - `surfaceKind` is unknown
 - `entrypoint` is missing
+- `entrypoint.runtime` is not `native-c`
 - a required host capability is undeclared or unsupported
 
 ### Compatibility and versioning
 
 - `manifestVersion` governs manifest-shape evolution
 - `abiVersion` governs runtime boundary compatibility
+- public surface entrypoints must stay Native C ABI entrypoints; C++ internals, when justified, must remain hidden behind a Native C facade
 - package upgrades must not silently widen required capabilities
 
 Example file: [surface-thread.example.json](../config/runtime-packages/surface-thread.example.json)
@@ -132,9 +135,11 @@ The future native runtime should:
 The next records that build directly on these manifest contracts are:
 
 - [runtime-first-migration-seam.md](runtime-first-migration-seam.md)
+- [runtime-container-interface.md](runtime-container-interface.md)
 - [conversation-surface-program-model.md](conversation-surface-program-model.md)
 
 ## Initial manifest files
 
 - [surface-thread.example.json](../config/runtime-packages/surface-thread.example.json)
+- [surface-timeline.example.json](../config/runtime-packages/surface-timeline.example.json)
 - [helper-review.example.json](../config/runtime-packages/helper-review.example.json)

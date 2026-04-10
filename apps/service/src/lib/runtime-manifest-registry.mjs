@@ -29,6 +29,8 @@ const HELPER_REQUIRED_FIELDS = [
   'presentationHooks'
 ];
 
+const SUPPORTED_SURFACE_KINDS = new Set(['channel', 'forum', 'thread', 'timeline', 'direct']);
+
 function isNonEmptyString(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -61,6 +63,26 @@ function inferManifestType(manifest) {
   throw new Error('Runtime manifest must declare either surfaceKind or sourceRuntime.');
 }
 
+function normalizeNativeEntrypoint(entrypoint, packageId) {
+  if (!entrypoint || typeof entrypoint !== 'object' || Array.isArray(entrypoint)) {
+    throw new Error(`Surface manifest ${packageId} must declare entrypoint as an object.`);
+  }
+
+  if (entrypoint.runtime !== 'native-c') {
+    throw new Error(`Surface manifest ${packageId} must declare entrypoint.runtime as native-c.`);
+  }
+
+  if (!isNonEmptyString(entrypoint.symbol)) {
+    throw new Error(`Surface manifest ${packageId} must declare entrypoint.symbol as a non-empty string.`);
+  }
+
+  return {
+    ...entrypoint,
+    runtime: 'native-c',
+    symbol: entrypoint.symbol.trim()
+  };
+}
+
 function normalizeSurfaceManifest(manifest, sourcePath) {
   assertRequiredFields(manifest, SURFACE_REQUIRED_FIELDS, 'surface');
   const packageId = manifest.packageId;
@@ -68,13 +90,19 @@ function normalizeSurfaceManifest(manifest, sourcePath) {
     throw new Error('surface manifest packageId must be a non-empty string.');
   }
 
+  const surfaceKind = manifest.surfaceKind.trim();
+  if (!SUPPORTED_SURFACE_KINDS.has(surfaceKind)) {
+    throw new Error(`Surface manifest ${packageId} declares unsupported surfaceKind ${surfaceKind}.`);
+  }
+
   return {
     ...manifest,
     packageId: packageId.trim(),
     displayName: manifest.displayName.trim(),
-    surfaceKind: manifest.surfaceKind.trim(),
+    surfaceKind,
     manifestVersion: String(manifest.manifestVersion).trim(),
     abiVersion: String(manifest.abiVersion).trim(),
+    entrypoint: normalizeNativeEntrypoint(manifest.entrypoint, packageId),
     hostCapabilities: toStringArray(manifest.hostCapabilities, 'hostCapabilities', packageId),
     helperSlots: Array.isArray(manifest.helperSlots)
       ? manifest.helperSlots

@@ -56,8 +56,13 @@ The April 1, 2026 direction for future NEXUS desktop work is:
 - Avalonia as the desktop UI host where a managed shell is still useful
 - native C interop as the preferred boundary between the UI host and native runtime components
 - C# only where necessary for Avalonia hosting, glue code, or thin orchestration layers
+- C++ only for narrowly justified component internals when Native C is not viable, hidden behind the Native C boundary
+- NEXUS as a container interface for surface programs and approved helper programs, not a monolithic rewrite of imported runtimes
 
 That means Electron and the current Node-managed desktop shell should be treated as the continuity baseline already present in repo, not the intended long-term desktop stack.
+
+The bounded architecture contract is recorded in [docs/architecture-contract.md](docs/architecture-contract.md).
+The runtime container interface for component programs is recorded in [docs/runtime-container-interface.md](docs/runtime-container-interface.md).
 
 ## Storage modes
 
@@ -162,6 +167,8 @@ Live `POST /api/adapters/discord/events` ingress now persists a relay record for
 - [ANVIL integration contract](docs/anvil-integration-contract.md)
 - [Discord cutover plan](docs/discord-cutover-plan.md)
 - [Hosted service mode](docs/hosted-service-mode.md)
+- [Architecture contract](docs/architecture-contract.md)
+- [Runtime container interface](docs/runtime-container-interface.md)
 - [Runtime topology](docs/runtime-topology.md)
 - [First runtime migration seam](docs/runtime-first-migration-seam.md)
 - [Runtime package manifests](docs/runtime-package-manifests.md)
