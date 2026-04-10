@@ -1,10 +1,10 @@
 {
   "title": "Project Pulse",
-  "capturedAt": "2026-04-10T06:47:14+09:00",
-  "capturedAtLabel": "Reviewed Apr 10, 2026, 06:47 JST",
-  "summary": "Issue #57 has moved forward again: the runtime supervisor now owns additive runtime lifecycle requests alongside route activation, command dispatch, event listing, and helper-crash isolation, and the health surface shows lifecycle gating directly.",
-  "source": "GitHub-first NEXUS truth sweep on Apr 10, 2026 JST, plus verified branch coverage for supervisor-owned runtime lifecycle requests, lifecycle event ownership, and operator-visible health updates.",
-  "nextAction": "Publish the active #57 runtime lifecycle-request delta, keep the new lifecycle-gate visibility truthful in the client, and continue the deeper runtime log-stream and failure-audit seam behind the supervisor boundary.",
+  "capturedAt": "2026-04-10T10:39:31+09:00",
+  "capturedAtLabel": "Reviewed Apr 10, 2026, 10:39 JST",
+  "summary": "Issue #57 is being tightened against the approved architecture direction: NEXUS is now explicitly tracked as a Native-C-first runtime container for multiple component programs, with Avalonia as the target host, C# as thin glue, C++ constrained to hidden component internals, and the current UI shifted away from the beige continuity theme toward Matrix Code.",
+  "source": "GitHub-first NEXUS truth sweep on Apr 10, 2026 JST, issue #57 architecture-alignment audit, and local verification of the runtime container contract, timeline surface package, native-c manifest enforcement, and Matrix Code client theme.",
+  "nextAction": "Publish the architecture-alignment delta for #57, then continue the deeper runtime log-stream and failure-audit seam behind the supervisor boundary.",
   "lanes": [
     {
       "kind": "PR",
@@ -183,9 +183,17 @@
       "ref": "#57",
       "status": "execute-now",
       "title": "Packaging and runtime topology",
-      "summary": "With #56 shipped, the runtime-topology lane is active again. The degraded runtime supervisor seam now retains active route-activation state, owns additive runtime lifecycle requests, command dispatch, event listing, and helper-crash restart/degrade isolation, and surfaces lifecycle, route, command, and crash ownership in health without breaking the current HTTP contract.",
-      "nextAction": "Publish the active runtime lifecycle-request delta, then continue moving deeper runtime log-stream and failure-audit ownership behind the supervisor seam.",
+      "summary": "With #56 shipped, the runtime-topology lane is active again. The current alignment slice codifies NEXUS as a Native-C-first runtime container for multiple surface/helper component programs, pins C++ to hidden component internals only when Native C is not viable, adds the named runtime-container interface, extends package coverage to the timeline surface, and gives the continuity UI a Matrix Code theme.",
+      "nextAction": "Publish the architecture-alignment PR and issue writeback, then continue moving deeper runtime log-stream and failure-audit ownership behind the supervisor seam.",
       "artifacts": [
+        {
+          "label": "Architecture contract",
+          "path": "docs/architecture-contract.md"
+        },
+        {
+          "label": "Runtime container interface",
+          "path": "docs/runtime-container-interface.md"
+        },
         {
           "label": "First migration seam record",
           "path": "docs/runtime-first-migration-seam.md"
@@ -197,6 +205,14 @@
         {
           "label": "Runtime topology record",
           "path": "docs/runtime-topology.md"
+        },
+        {
+          "label": "Timeline surface example",
+          "path": "config/runtime-packages/surface-timeline.example.json"
+        },
+        {
+          "label": "Matrix Code client theme",
+          "path": "apps/web/public/styles.css"
         },
         {
           "label": "Runtime supervisor seam",

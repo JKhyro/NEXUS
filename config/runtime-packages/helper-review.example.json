@@ -25,6 +25,10 @@
     {
       "surfacePackageId": "nexus.surface.direct",
       "slotId": "participant-card"
+    },
+    {
+      "surfacePackageId": "nexus.surface.timeline",
+      "slotId": "timeline-filter"
     }
   ],
   "presentationHooks": [

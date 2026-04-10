@@ -6,6 +6,8 @@ This record defines the first concrete packaging and runtime split for NEXUS iss
 
 The goal is to make the native-C-first target explicit without pretending the current Electron and Node baseline has already been replaced.
 
+This topology is governed by the bounded [architecture contract](architecture-contract.md) and the [runtime container interface](runtime-container-interface.md), including the rule that NEXUS is a container interface for multiple component programs and that C++ is allowed only for narrowly justified component internals hidden behind a Native C facade.
+
 ## Topology decision
 
 The target desktop stack is a four-part system:
@@ -20,6 +22,8 @@ The target desktop stack is a four-part system:
    Imported helper programs attached to surface hosts through explicit capability metadata and registry ownership, not by implicit process co-ownership.
 
 The current Electron shell and Node-managed service remain the continuity baseline and migration source.
+
+The target stack is not a C++ desktop rewrite. Native C owns runtime and interop responsibilities, Avalonia owns the desktop host, C# remains thin host glue, and surface/helper programs are loaded as explicit components through package metadata.
 
 ## Ownership split
 
@@ -40,6 +44,7 @@ Native C does not own:
 - Avalonia view composition
 - presentation-only helper styling
 - operator copy that belongs to PRISM or other external style authorities
+- C++ object models or private allocator lifetimes at the public host boundary
 
 ### Avalonia host
 
@@ -56,6 +61,7 @@ Avalonia does not own:
 - helper runtime identity
 - long-lived native process supervision
 - registry truth for imported helper packages
+- runtime policy hidden in C# glue
 
 ### Registry and external authorities
 
@@ -64,6 +70,8 @@ Avalonia does not own:
 NEXUS renders and hosts imported helper surfaces, but it must not absorb their runtime authority or rewrite their registry identity.
 
 ## Packaging units
+
+NEXUS package loading treats the product as a container for component programs. Surface packages are NEXUS-owned route-local programs. Helper packages are imported or adjacent programs with source-runtime identity and explicit slot permissions. Runtime components provide supervision and activation services but do not become presentation owners.
 
 ### Surface package
 
@@ -190,5 +198,6 @@ The target stack is therefore explicit, but the current mainline baseline remain
 ## Current concrete follow-ons
 
 - [runtime-package-manifests.md](runtime-package-manifests.md) pins the first concrete surface-package and helper-package manifest shapes against this topology.
+- [runtime-container-interface.md](runtime-container-interface.md) names the runtime container contract for route-local surface programs and helper slots.
 - [runtime-first-migration-seam.md](runtime-first-migration-seam.md) chooses the first replacement seam away from Electron without breaking the verified continuity baseline.
 - [conversation-surface-program-model.md](conversation-surface-program-model.md) activates the first child-program model for channel, forum, thread, timeline, and direct surfaces against those manifest contracts.

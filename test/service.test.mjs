@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createNexusService } from '../apps/service/src/server.mjs';
 import { resolveServiceConfig } from '../apps/service/src/lib/config.mjs';
 import { createInProcessRuntimeAdapter } from '../apps/service/src/lib/runtime-adapter.mjs';
+import { createRuntimeManifestRegistry } from '../apps/service/src/lib/runtime-manifest-registry.mjs';
 import { createStore } from '../apps/service/src/lib/store-factory.mjs';
 
 async function withService(run) {
@@ -34,6 +35,37 @@ function createFailingManifestRegistry(code = 'TEST_RUNTIME_SUPERVISOR_BOOT_FAIL
   };
 }
 
+test('runtime manifest registry rejects surface packages without native-c entrypoints', async () => {
+  const repoRoot = await mkdtemp(join(tmpdir(), 'nexus-manifest-'));
+  const manifestDirectory = join(repoRoot, 'config', 'runtime-packages');
+  await mkdir(manifestDirectory, { recursive: true });
+  await writeFile(join(manifestDirectory, 'surface-invalid.example.json'), JSON.stringify({
+    packageId: 'nexus.surface.invalid',
+    displayName: 'Invalid Surface',
+    manifestVersion: '1',
+    abiVersion: '1',
+    surfaceKind: 'thread',
+    entrypoint: {
+      runtime: 'cpp',
+      symbol: 'nexus_surface_invalid_bootstrap'
+    },
+    hostCapabilities: ['conversation.read'],
+    routing: {
+      scopeType: 'thread'
+    },
+    failurePolicy: {
+      onCrash: 'degrade-surface'
+    }
+  }));
+
+  const registry = createRuntimeManifestRegistry({ repoRoot });
+
+  await assert.rejects(
+    () => registry.getSummary(),
+    /entrypoint\.runtime as native-c/
+  );
+});
+
 test('service boots and exposes the seeded internal channel map', async () => {
   await withService(async (service) => {
     const health = await fetch(`${service.url}/api/health`).then((response) => response.json());
@@ -56,7 +88,7 @@ test('service boots and exposes the seeded internal channel map', async () => {
     assert.equal(health.runtime.lastLifecycleRequest, null);
     assert.equal(health.runtime.activeRouteActivationCount, 0);
     assert.deepEqual(health.runtime.activeRouteActivations, []);
-    assert.equal(health.runtime.manifestRegistry.surfacePackageCount, 4);
+    assert.equal(health.runtime.manifestRegistry.surfacePackageCount, 5);
     assert.equal(health.runtime.manifestRegistry.helperPackageCount, 1);
     assert.equal(health.runtime.supervisor.transitionSeam, 'service-runtime-supervisor-boundary');
     assert.equal(health.runtime.supervisor.readiness, 'ready');
@@ -300,6 +332,43 @@ test('route activation resolves a manifest-backed direct surface and compatible 
     assert.equal(activation.surface.packageId, 'nexus.surface.direct');
     assert.equal(activation.helperSlots.length, 1);
     assert.equal(activation.helperSlots[0].status, 'bound');
+    assert.deepEqual(activation.diagnostics, []);
+  });
+});
+
+test('route activation resolves a manifest-backed timeline surface and compatible helper slot', async () => {
+  await withService(async (service) => {
+    const activationResponse = await fetch(`${service.url}/api/runtime/route-activations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        actorId: 'identity-jack',
+        workspaceId: 'workspace-internal-core',
+        surfaceKind: 'timeline',
+        scopeId: 'timeline-internal-core',
+        surfacePackageId: 'nexus.surface.timeline',
+        routeCapabilities: [
+          'conversation.read',
+          'coordination.focus',
+          'route.selection'
+        ],
+        helperSlotRequests: [
+          {
+            slotId: 'timeline-filter',
+            preferredHelperPackageId: 'symbiosis.helper.review'
+          }
+        ]
+      })
+    });
+    const activation = await activationResponse.json();
+
+    assert.equal(activationResponse.status, 200);
+    assert.equal(activation.route.surfaceKind, 'timeline');
+    assert.equal(activation.route.scopeId, 'timeline-internal-core');
+    assert.equal(activation.surface.packageId, 'nexus.surface.timeline');
+    assert.equal(activation.helperSlots.length, 1);
+    assert.equal(activation.helperSlots[0].status, 'bound');
+    assert.equal(activation.helperSlots[0].helper.packageId, 'symbiosis.helper.review');
     assert.deepEqual(activation.diagnostics, []);
   });
 });
